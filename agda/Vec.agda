@@ -10,13 +10,36 @@ data Vec (A : Set) : ℕ → Set where
   []  : Vec A 0
   _∷_ : ∀ {n} → A → Vec A n → Vec A (S n)
 
-data All {A : Set} (P : A → Set) : ∀ {n} → Vec A n → Set where
+infix 4 [_
+[_ : ∀ {A n} → Vec A n → Vec A n
+[ xs = xs
+
+infixr 5 _,,_
+_,,_ : ∀ {A n} → A → Vec A n → Vec A (S n)
+x ,, xs = x ∷ xs
+
+infixr 5 _]
+_] : ∀ {A} → A → Vec A 1
+x ] = x ∷ []
+
+data All {A} (P : A → Set) : ∀ {n} → Vec A n → Set where
   []  : All P []
-  _∷_ : ∀ {n x xs} → P x → All P {n} xs → All P {S n} (x ∷ xs)
+  _∷_ : ∀ {n x} {xs : Vec A n} → P x → All P xs → All P (x ∷ xs)
 
 data Any {A : Set} (P : A → Set) : ∀ {n} → Vec A n → Set where
-  Z : ∀ {n x xs} → P x → Any P {S n} (x ∷ xs)
-  S : ∀ {n x xs} → Any P {n} xs → Any P {S n} (x ∷ xs)
+  Z : ∀ {n x} {xs : Vec A n} → P x → Any P (x ∷ xs)
+  S : ∀ {n x} {xs : Vec A n} → Any P xs → Any P (x ∷ xs)
+
+map : ∀ {A B n} (f : A → B) → Vec A n → Vec B n
+map f [] = []
+map f (x ∷ xs) = f x ∷ map f xs
+
+foldr : ∀ {A B : Set} {n} → (A → B → B) → B → Vec A n → B
+foldr f z [] = z
+foldr f z (x ∷ xs) = f x (foldr f z xs)
+
+sum : ∀ {n} → Vec ℕ n → ℕ
+sum = foldr _+_ 0
 
 --infix 3 _∈_
 _∈_ : ∀ {A n} (x : A) → Vec A n → Set
