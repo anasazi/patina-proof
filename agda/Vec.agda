@@ -1,6 +1,7 @@
 open import Nat
 open import Equality
 open import Decidable
+open import Fin
 open import Product
 
 module Vec where
@@ -29,6 +30,11 @@ data All {A} (P : A → Set) : ∀ {n} → Vec A n → Set where
 data Any {A : Set} (P : A → Set) : ∀ {n} → Vec A n → Set where
   Z : ∀ {n x} {xs : Vec A n} → P x → Any P (x ∷ xs)
   S : ∀ {n x} {xs : Vec A n} → Any P xs → Any P (x ∷ xs)
+
+infixl 8 _!_
+_!_ : ∀ {A n} → Vec A n → Fin n → A
+(x ∷ xs) ! fZ = x
+(x ∷ xs) ! fS i = xs ! i
 
 map : ∀ {A B n} (f : A → B) → Vec A n → Vec B n
 map f [] = []
