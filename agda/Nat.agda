@@ -1,6 +1,7 @@
 open import Function
 open import Decidable
 open import Equality
+open import Bool
 module Nat where
   data ℕ : Set where
     Z : ℕ
@@ -27,3 +28,16 @@ module Nat where
 
   EqNat : Eq ℕ
   EqNat = record { _==_ = _=ℕ=_ }
+
+  +-n-Sm : ∀ n m → n + S m ≡ S (n + m)
+  +-n-Sm Z m = refl
+  +-n-Sm (S n) m = cong S (+-n-Sm n m)
+
+  data _<_ : ℕ → ℕ → Set where
+    z<s : ∀ {n} → Z < S n
+    s<s : ∀ {n m} → n < m → S n < S m
+
+  lessNat : ℕ → ℕ → Bool
+  lessNat n Z = false
+  lessNat Z (S m) = true
+  lessNat (S n) (S m) = lessNat n m
