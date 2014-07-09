@@ -11,6 +11,7 @@ open import Equality
 open import Nat
 --open import List
 open import Vec
+open import Fin
 
 -- patina stuff
 open import Id
@@ -175,7 +176,73 @@ module Types where
   copy-drop (rec ℓ (_ ∷ τs)) (rec (_ ∷ Cτs) , rec (S Dτs)) = copy-drop (rec ℓ τs) (rec Cτs , rec Dτs)
   copy-drop (var _) (() , _)
   copy-drop (μ _ τ) (μ Cτ , μ Dτ) = copy-drop τ (Cτ , Dτ)
-  
+
+  Cxt = Vec Type
+
+  -- the test context from the redex file
+  test-Γ : Cxt 12
+  test-Γ = [  int -- i
+           ,, box int -- p
+           -- redex contexts are lists of lists
+           -- in the redex model, there's a list boundary here
+           ,, srs-A -- a
+           ,, srs-B static -- b
+           ,, srs-C static -- c
+           ,, ref (life 13 {- b1 in redex -}) imm int -- q
+           ,, box int -- r
+           ,, opt (box int) -- s
+           -- vec int 3 -- ints3
+           ,, int -- i0
+           ,, int -- i1
+           ,, int -- i2
+           ,, int -- i3
+           -- ref (life 13) imm (vec int 3) -- ints3p
+           -- ref (life 13) imm (vec int erased) -- intsp
+           ]
+
+open Types public  
+
+module Paths where
+
+  data Path : Set where
+    var : ∀ {n} → Fin n → Path -- variables (index into the context)
+    deref : Path → Path -- dereferences
+    -- field projection (index into the vector of types in a record)
+    proj : ∀ {n} → Fin n → Path → Path
+
+  -- lvtype
+  -- typing judgment for paths
+  data _⊢_∶_ {n} : Cxt n → Path → Type → Set where
+    var : ∀ {Γ} {i : Fin n} → Γ ⊢ var i ∶ (Γ ! i)
+    box : ∀ {Γ p τ} → Γ ⊢ p ∶ box τ → Γ ⊢ deref p ∶ τ
+    ref : ∀ {Γ p τ ℓ mq} → Γ ⊢ p ∶ ref ℓ mq τ → Γ ⊢ deref p ∶ τ
+    proj : ∀ {n1 n2 Γ p} {i : Fin n2} {vℓs : Vec _ n1} {τs : Vec _ n2}
+         → Γ ⊢ p ∶ rec vℓs τs
+         → Γ ⊢ proj i p ∶ (τs ! i)
+
+  test-path-type-deref-p : test-Γ ⊢ deref (var (fin 1)) ∶ int
+  test-path-type-deref-p = box var
+  test-path-type-proj-1-c : test-Γ ⊢ proj (fin 1) (var (fin 4)) ∶ srs-B static
+  test-path-type-proj-1-c = proj var
+
+  -- prefix-paths
+  prefix-paths : Path → Σ ℕ ** Vec Path
+  prefix-paths (var x) = 1 , ([ var x ])
+  prefix-paths (deref p) = (S *** _∷_ (deref p)) (prefix-paths p)
+  prefix-paths (proj f p) = (S *** _∷_ (proj f p)) (prefix-paths p)
+
+
+  test-prefix-paths-var : prefix-paths (var {1} (fin 0)) ≡ 1 , ([ var (fin 0) ])
+  test-prefix-paths-var = refl
+  -- test from redex
+  test-prefix-paths : prefix-paths (deref (proj {2} (fin 1) (var {1} (fin 0)))) ≡
+                      3 , ([ (deref (proj {2} (fin 1) (var {1} (fin 0))))
+                          ,, (proj {2} (fin 1) (var {1} (fin 0)))
+                          ,, var {1} (fin 0)
+                          ])
+  test-prefix-paths = refl
+
+open Paths public
 
 --   data Type : Set where
 --     int : Type
