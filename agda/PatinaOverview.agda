@@ -11,6 +11,8 @@ open import Unit
 open import Bool
 module PatinaOverview {Life : Set} {{EqLife : Eq Life}} where
 
+-- TODO need to add lifetime relation well-formed conditions everywhere we use them
+
 -- the lifetime relation (an irreflexive, transitive relation)
 -- currently Patina cannot describe relationships between lifetime parameters.
 -- this has the effect of creating some number of top level lifetimes (the parameters + 'static) that are all unrelated
