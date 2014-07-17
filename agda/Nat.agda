@@ -8,12 +8,12 @@ module Nat where
     S : ℕ → ℕ
 
   {-# BUILTIN NATURAL ℕ #-}
-  {-# BUILTIN ZERO Z #-}
-  {-# BUILTIN SUC S #-}
+  --{-# BUILTIN ZERO Z #-}
+  --{-# BUILTIN SUC S #-}
 
-  _+_ : ℕ → ℕ → ℕ
-  Z   + m = m
-  S n + m = S (n + m)
+  plus : ℕ → ℕ → ℕ
+  plus Z     m = m
+  plus (S n) m = S (plus n m)
 
   S-inj : ∀ {n m} → S n ≡ S m → n ≡ m
   S-inj refl = refl
@@ -28,8 +28,13 @@ module Nat where
 
   EqNat : Eq ℕ
   EqNat = record { _==_ = _=ℕ=_ }
+  
+  max : ℕ → ℕ → ℕ
+  max Z m = m
+  max (S n) Z = S n
+  max (S n) (S m) = S (max n m)
 
-  +-n-Sm : ∀ n m → n + S m ≡ S (n + m)
+  +-n-Sm : ∀ n m → plus n (S m) ≡ S (plus n m)
   +-n-Sm Z m = refl
   +-n-Sm (S n) m = cong S (+-n-Sm n m)
 
