@@ -37,85 +37,85 @@ module LifeRelEx where
     ex-Λ = ex-b <: (ex-a <: (top ex-l0 & top ex-l1))
   
  -- is a lifetime defined by the relation?
-data defines : Life → LifeRel → Set where
+data _⊢_defined : LifeRel → Life → Set where
   -- top level lifetimes define only themselves
-  top : ∀ {ℓ ℓ′} → ℓ ≡ ℓ′ → defines ℓ (top ℓ′)
+  top : ∀ {ℓ ℓ′} → ℓ ≡ ℓ′ → top ℓ′ ⊢ ℓ defined
   -- sublife relations define the lifetime argument
-  sub-def : ∀ {ℓ ℓ′ Λ} → ℓ ≡ ℓ′ → defines ℓ (ℓ′ <: Λ) 
+  sub-def : ∀ {ℓ ℓ′ Λ} → ℓ ≡ ℓ′ → (ℓ′ <: Λ) ⊢ ℓ defined
   -- a lifetime defined by a relation is still defined when a new lifetime is added
-  sub-con : ∀ {ℓ ℓ′ Λ} → defines ℓ Λ → defines ℓ (ℓ′ <: Λ) 
+  sub-ind : ∀ {ℓ ℓ′ Λ} → Λ ⊢ ℓ defined  → (ℓ′ <: Λ) ⊢ ℓ defined
   -- a lifetime is defined by a union if it is defined by either half
-  and : ∀ {ℓ Λ₁ Λ₂} → defines ℓ Λ₁ + defines ℓ Λ₂ → defines ℓ (Λ₁ & Λ₂)
+  and : ∀ {ℓ Λ₁ Λ₂} → Λ₁ ⊢ ℓ defined + Λ₂ ⊢ ℓ defined → (Λ₁ & Λ₂) ⊢ ℓ defined
   
 -- decision procedure for lifetime defintion
-defines? : (ℓ : Life) → (Λ : LifeRel) → Dec (defines ℓ Λ)
+defined? : (Λ : LifeRel) (ℓ : Life) → Dec (Λ ⊢ ℓ defined)
 -- top defines itself and nothing else
-defines? ℓ (top ℓ′) with ℓ == ℓ′
+defined? (top ℓ′) ℓ with ℓ == ℓ′
 ... | yes eq = yes (top eq)
 ... | no ¬eq = no (λ {(top eq) → ¬eq eq})
-defines? ℓ (ℓ′ <: Λ) with ℓ == ℓ′
+defined? (ℓ′ <: Λ) ℓ with ℓ == ℓ′
 -- sub defines its lifetime argument
 ... | yes eq = yes (sub-def eq)
 -- and otherwise inherits the definitions of its relation argument
-... | no ¬eq with defines? ℓ Λ
-... | yes ih = yes (sub-con ih)
-... | no ¬ih = no (λ {(sub-def eq) → ¬eq eq ; (sub-con ih) → ¬ih ih})
+... | no ¬eq with defined? Λ ℓ
+... | yes ih = yes (sub-ind ih)
+... | no ¬ih = no (λ {(sub-def eq) → ¬eq eq ; (sub-ind ih) → ¬ih ih})
 -- union defines anything defined in either argument
-defines? ℓ (Λ1 & Λ2) with defines? ℓ Λ1 | defines? ℓ Λ2
-defines? ℓ (Λ1 & Λ2) | yes ih1 | ih2? = yes (and (inl ih1))
-defines? ℓ (Λ1 & Λ2) | no ¬ih1 | yes ih2 = yes (and (inr ih2))
-defines? ℓ (Λ1 & Λ2) | no ¬ih1 | no ¬ih2 = no (λ { (and (inl ih1)) → ¬ih1 ih1 
+defined? (Λ1 & Λ2) ℓ with defined? Λ1 ℓ | defined? Λ2 ℓ
+defined? (Λ1 & Λ2) ℓ | yes ih1 | ih2? = yes (and (inl ih1))
+defined? (Λ1 & Λ2) ℓ | no ¬ih1 | yes ih2 = yes (and (inr ih2))
+defined? (Λ1 & Λ2) ℓ | no ¬ih1 | no ¬ih2 = no (λ { (and (inl ih1)) → ¬ih1 ih1 
                                                  ; (and (inr ih2)) → ¬ih2 ih2})
 
 -- we can't define something undefined by adding something else to the relation
-¬def-cons : ∀ {ℓ ℓ′ Λ} → ¬ (ℓ ≡ ℓ′) → ¬ (defines ℓ Λ) → ¬ (defines ℓ (ℓ′ <: Λ))
+¬def-cons : ∀ {ℓ ℓ′ Λ} → ¬ (ℓ ≡ ℓ′) → ¬ (Λ ⊢ ℓ defined) → ¬ ((ℓ′ <: Λ) ⊢ ℓ defined)
 ¬def-cons ¬eq ¬def (sub-def eq) = ¬eq eq
-¬def-cons ¬eq ¬def (sub-con def) = ¬def def
+¬def-cons ¬eq ¬def (sub-ind def) = ¬def def
   
 -- sublife judgment
-data sublife : LifeRel → Life → Life → Set where
+data _⊢_<:_ : LifeRel → Life → Life → Set where
   -- a new lifetime is a sublifetime of anything already defined in the relation
-  rel : ∀ {ℓ ℓ₁ ℓ₂ Λ} → ℓ ≡ ℓ₁ → defines ℓ₂ Λ → sublife (ℓ <: Λ) ℓ₁ ℓ₂
+  rel : ∀ {ℓ ℓ₁ ℓ₂ Λ} → ℓ ≡ ℓ₁ → Λ ⊢ ℓ₂ defined → (ℓ <: Λ) ⊢ ℓ₁ <: ℓ₂
   -- sublife is preserved by adding other things to the relation
-  sub : ∀ {ℓ ℓ₁ ℓ₂ Λ} → sublife Λ ℓ₁ ℓ₂ → sublife (ℓ <: Λ) ℓ₁ ℓ₂
+  sub : ∀ {ℓ ℓ₁ ℓ₂ Λ} → Λ ⊢ ℓ₁ <: ℓ₂ → (ℓ <: Λ) ⊢ ℓ₁ <: ℓ₂
   -- if either part of a union proves a sublife relationship, then the union does too
-  and : ∀ {ℓ₁ ℓ₂ Λ₁ Λ₂} → sublife Λ₁ ℓ₁ ℓ₂ + sublife Λ₂ ℓ₁ ℓ₂ → sublife (Λ₁ & Λ₂) ℓ₁ ℓ₂
+  and : ∀ {ℓ₁ ℓ₂ Λ₁ Λ₂} → Λ₁ ⊢ ℓ₁ <: ℓ₂ + Λ₂ ⊢ ℓ₁ <: ℓ₂ → (Λ₁ & Λ₂) ⊢ ℓ₁ <: ℓ₂
   
 -- sublife implies defined for both arguments
-sub=>def-1 : ∀ {ℓ1 ℓ2 Λ} → sublife Λ ℓ1 ℓ2 → defines ℓ1 Λ
+sub=>def-1 : ∀ {ℓ1 ℓ2 Λ} → Λ ⊢ ℓ1 <: ℓ2 → Λ ⊢ ℓ1 defined
 sub=>def-1 (rel refl def2) = sub-def refl
-sub=>def-1 (sub pf) = sub-con (sub=>def-1 pf)
+sub=>def-1 (sub pf) = sub-ind (sub=>def-1 pf)
 sub=>def-1 (and (inl pf)) = and (inl (sub=>def-1 pf))
 sub=>def-1 (and (inr pf)) = and (inr (sub=>def-1 pf))
 
-sub=>def-2 : ∀ {ℓ1 ℓ2 Λ} → sublife Λ ℓ1 ℓ2 → defines ℓ2 Λ
-sub=>def-2 (rel eq def2) = sub-con def2
-sub=>def-2 (sub pf) = sub-con (sub=>def-2 pf)
+sub=>def-2 : ∀ {ℓ1 ℓ2 Λ} → Λ ⊢ ℓ1 <: ℓ2 → Λ ⊢ ℓ2 defined
+sub=>def-2 (rel eq def2) = sub-ind def2
+sub=>def-2 (sub pf) = sub-ind (sub=>def-2 pf)
 sub=>def-2 (and (inl pf)) = and (inl (sub=>def-2 pf))
 sub=>def-2 (and (inr pf)) = and (inr (sub=>def-2 pf))
 
 -- the second lifetime of a sublife judgment must already be defined
-cons=>def : ∀ {ℓ ℓ′ Λ} → sublife (ℓ′ <: Λ) ℓ′ ℓ → defines ℓ Λ
+cons=>def : ∀ {ℓ ℓ′ Λ} → (ℓ′ <: Λ) ⊢ ℓ′ <: ℓ → Λ ⊢ ℓ defined
 cons=>def (rel eq def) = def
 cons=>def (sub pf) = sub=>def-2 pf
   
 -- sublife decision procedure
-sublife? : (Λ : LifeRel) (ℓ1 ℓ2 : Life) → Dec (sublife Λ ℓ1 ℓ2)
+sublife? : (Λ : LifeRel) (ℓ1 ℓ2 : Life) → Dec (Λ ⊢ ℓ1 <: ℓ2)
 -- first we need to check whether ℓ1 is defined by Λ
-sublife? Λ ℓ1 ℓ2 with defines? ℓ1 Λ 
+sublife? Λ ℓ1 ℓ2 with defined? Λ ℓ1
 -- if it is, then we can examine how it is defined
 -- if the relation is *only* ℓ1, then ¬ (ℓ1 <: ℓ2) due to irreflexivity
 sublife? (top ℓ1) .ℓ1 ℓ2 | yes (top refl) = no (λ ()) 
 -- if ℓ1 is cons onto some other relation, 
 -- we need to examine if ℓ2 is defined by the rest
-sublife? (ℓ1 <: Λ) .ℓ1 ℓ2 | yes (sub-def refl) with defines? ℓ2 Λ
+sublife? (ℓ1 <: Λ) .ℓ1 ℓ2 | yes (sub-def refl) with defined? Λ ℓ2
 -- if so, then ℓ1 <: ℓ2
 ... | yes ℓ2-def = yes (rel refl ℓ2-def)
 -- otherwise they can't be (since ℓ2 doesn't exist)
 ... | no ¬ℓ2-def = no (¬ℓ2-def ∘ cons=>def)
 -- if some other lifetime is consed onto the relation defining ℓ1, 
 -- we need to inductively find a sublife proof
-sublife? (ℓ <: Λ) ℓ1 ℓ2 | yes (sub-con def1) with sublife? Λ ℓ1 ℓ2
+sublife? (ℓ <: Λ) ℓ1 ℓ2 | yes (sub-ind def1) with sublife? Λ ℓ1 ℓ2
 -- if we do find one, then we can prove a sublife relationship
 ... | yes ih = yes (sub ih)
 -- if we don't, then there is no relationship in a well-formed relation (i.e. ¬ (ℓ ≡ ℓ1))
@@ -125,11 +125,11 @@ sublife? (ℓ <: Λ) ℓ1 ℓ2 | yes (sub-con def1) with sublife? Λ ℓ1 ℓ2
 -- if they aren't equal (i.e. well-formed) then there is no relation
 ... | no ¬eq = no (λ {(rel eq def2) → ¬eq eq ; (sub ih) → ¬ih ih})
 -- if they are equal (i.e. not well-formed) we need to check if ℓ2 is defined
-sublife? (ℓ1 <: Λ) .ℓ1 ℓ2 | yes (sub-con def1) | no ¬ih | yes refl with defines? ℓ2 Λ
+sublife? (ℓ1 <: Λ) .ℓ1 ℓ2 | yes (sub-ind def1) | no ¬ih | yes refl with defined? Λ ℓ2
 -- if it is, then ℓ1 is related to ℓ2 (this shouldn't ever be an issue if we use well-formed relations)
-sublife? (ℓ1 <: Λ) .ℓ1 ℓ2 | yes (sub-con def1) | no ¬ih | yes refl | yes def2 = yes (rel refl def2)
+sublife? (ℓ1 <: Λ) .ℓ1 ℓ2 | yes (sub-ind def1) | no ¬ih | yes refl | yes def2 = yes (rel refl def2)
 -- if not, then there's no relation
-sublife? (ℓ1 <: Λ) .ℓ1 ℓ2 | yes (sub-con def1) | no ¬ih | yes refl | no ¬def2 = no (¬def2 ∘ cons=>def)
+sublife? (ℓ1 <: Λ) .ℓ1 ℓ2 | yes (sub-ind def1) | no ¬ih | yes refl | no ¬def2 = no (¬def2 ∘ cons=>def)
 -- if ℓ1 is defined by a union of relations, we need to induct into both sides of the union
 sublife? (Λ1 & Λ2) ℓ1 ℓ2 | yes (and def1) with sublife? Λ1 ℓ1 ℓ2 | sublife? Λ2 ℓ1 ℓ2
 -- if the first half proves it, then we can prove it
@@ -142,20 +142,20 @@ sublife? (Λ1 & Λ2) ℓ1 ℓ2 | yes (and def1) with sublife? Λ1 ℓ1 ℓ2 | su
 sublife? Λ ℓ1 ℓ2 | no ¬def1 = no (contrapositive sub=>def-1 ¬def1)
 
 -- lifetime relation well-formedness
-data LifeRelWellFormed : LifeRel → Set where
+data ⊢_wf-rel : LifeRel → Set where
   -- top level relations are always well-formed
-  top : ∀ {ℓ} → LifeRelWellFormed (top ℓ)
+  top : ∀ {ℓ} → ⊢ top ℓ wf-rel
   -- adding a new lifetime to a well-formed relation is ok if the lifetime isn't already defined
-  sub : ∀ {ℓ Λ} → LifeRelWellFormed Λ → ¬ (defines ℓ Λ) → LifeRelWellFormed (ℓ <: Λ)
+  sub : ∀ {ℓ Λ} → ⊢ Λ wf-rel → ¬ (Λ ⊢ ℓ defined) → ⊢ ℓ <: Λ wf-rel
   -- a union of well-formed relations is well-formed if the two halves define disjoint sets
   and : ∀ {Λ₁ Λ₂} 
-      → LifeRelWellFormed Λ₁ 
-      → LifeRelWellFormed Λ₂ 
-      → (∀ ℓ → ¬ (defines ℓ Λ₁ × defines ℓ Λ₂)) -- both define disjoint sets -
-      → LifeRelWellFormed (Λ₁ & Λ₂)
+      → ⊢ Λ₁ wf-rel
+      → ⊢ Λ₂ wf-rel
+      → (∀ ℓ → ¬ (Λ₁ ⊢ ℓ defined × Λ₂ ⊢ ℓ defined)) -- both define disjoint sets -
+      → ⊢ Λ₁ & Λ₂ wf-rel
       
 -- sublife is irreflexive in a well-formed relation
-Λwf-irreflexive : ∀ {Λ ℓ} → LifeRelWellFormed Λ → ¬ (sublife Λ ℓ ℓ)
+Λwf-irreflexive : ∀ {Λ ℓ} → ⊢ Λ wf-rel → ¬ (Λ ⊢ ℓ <: ℓ)
 ---- case analysis on the proof of a sublife relationship
 -- if the sublife proof is direct proof, then there's only one case for the well-formed proof
 -- the sublife proof tells us that Λ defines ℓ, but the well-formed proof tells us the opposite, contradiction
@@ -170,7 +170,7 @@ data LifeRelWellFormed : LifeRel → Set where
 Λwf-irreflexive (and wf1 wf2 ¬def) (and (inr pf)) = Λwf-irreflexive wf2 pf
 
 -- sublife is transitive in a well-formed relation
-Λwf-transitive : ∀ {Λ ℓ1 ℓ2 ℓ3} → LifeRelWellFormed Λ → sublife Λ ℓ1 ℓ2 → sublife Λ ℓ2 ℓ3 → sublife Λ ℓ1 ℓ3
+Λwf-transitive : ∀ {Λ ℓ1 ℓ2 ℓ3} → ⊢ Λ wf-rel → Λ ⊢ ℓ1 <: ℓ2 → Λ ⊢ ℓ2 <: ℓ3 → Λ ⊢ ℓ1 <: ℓ3
 ---- case analysis on the two sublife proofs
 -- if both sublife proofs are direct proofs, then we can construct a direct proof
 Λwf-transitive wf (rel ℓ≡ℓ1 ℓ2-def) (rel ℓ≡ℓ2 ℓ3-def) = rel ℓ≡ℓ1 ℓ3-def
@@ -199,7 +199,7 @@ data Mut : Set where
 -- types are parameterized by the lifetimes in scope (can't use undefined lifetimes)
 -- structs are rendered as structural types here
 data Type (Λ : LifeRel) : Set where
--- type well-formedness mostly involves making sure structs are well formed
+-- type well-formedness mostly involves making sure structs are well formed (requires well-formed lifetime relation)
 data _⊢_wf-type : (Λ : LifeRel) → Type Λ → Set where
 
 -- Context mapping variables to types (we will be using de Bruijn indicies for variables)
@@ -265,6 +265,7 @@ Locs = List ∘ List $ Addr
 _,_,_⊢_wf-locs : (Λ : LifeRel) → Context Λ → Heap → Locs → Set
 Λ , Γ , H ⊢ V wf-locs = length Γ ≡ length V -- same domain (length) as context
                       × (flatten V ⊆ allocated-addresses H) -- all mapped to address are in the heap
+                      -- TODO do we need to require that Γ is well-formed as well?
 
 -- The paths (or lvalues) in Patina
 data Path (Λ : LifeRel) (Γ : Context Λ) : Set where
