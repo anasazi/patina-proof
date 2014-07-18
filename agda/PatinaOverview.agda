@@ -212,7 +212,8 @@ _⊢_wf-cxt : (Λ : LifeRel) → Context Λ → Set
 -- Addresses are references to slots of memory
 module Address where
   -- the implementation of addresses
-  data Addr : Set where
+  record Addr : Set where
+  open Addr public
   
   -- offset for addresses
   offset : Addr → ℕ → Addr
@@ -371,3 +372,9 @@ preservation : ∀ {Λ L} {C C′ : Config Λ} {Δ Δ′ : Deinit Λ (config-Γ 
                                                    × deinit-equiv Λ (config-Γ C) Δ′ (config-Γ C′) Δ′′′ -- and Δ′ is equivalent to Δ‌′′′
                                                    × bank-equiv Λ (config-Γ C) B′ (config-Γ C′) B′′′ }) -- and B′ is equivalent to B′′′
 preservation = {!!}
+
+
+-- actual soundness would be something like
+-- ∀ programs that are well-formed,
+-- the starting configuration {program, empty-heap, empty-locs, empty-cxt, [[call main]]}
+-- evalutates in some number of steps to the a finished configuration (i.e. empty-heap & empty-stack)
