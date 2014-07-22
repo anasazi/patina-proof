@@ -8,7 +8,7 @@ module Equality where
   {-# BUILTIN EQUALITY _≡_ #-}
   {-# BUILTIN REFL refl #-}
 
-  record Eq (A : Set) : Set where
+  record Eq {a} (A : Set a) : Set a where
     infix 4 _==_
     field
       _==_ : (x y : A) → Dec (x ≡ y)
