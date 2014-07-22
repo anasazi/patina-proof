@@ -88,7 +88,7 @@ module List where
   _∈_ : ∀ {a} {A : Set a} (x : A) → List A → Set a
   x ∈ xs = Any (_≡_ x) xs
 
-  _∈?_ : ∀ {A} {{EqA : Eq A}} (x : A) (xs : List A) → Dec (x ∈ xs)
+  _∈?_ : ∀ {a} {A : Set a} {{EqA : Eq A}} (x : A) (xs : List A) → Dec (x ∈ xs)
   x ∈? [] = no (λ ())
   x ∈? (y ∷ xs) with x == y | x ∈? xs
   .y ∈? (y ∷ xs) | yes refl | there = yes (aZ refl)
@@ -103,6 +103,18 @@ module List where
   x ∪ xs with x ∈? xs
   x ∪ xs | yes _ = xs
   x ∪ xs | no  _ = x ∷ xs
+
+  data NoDup {a} {A : Set a} : List A → Set a where
+    nd[] : NoDup []
+    _nd∷_ : ∀ {x xs} → ¬ (x ∈ xs) → NoDup xs → NoDup (x ∷ xs)
+
+  nodup? : ∀ {a} {A : Set a} {{EqA : Eq A}} → (xs : List A) → Dec (NoDup xs)
+  nodup? [] = yes nd[]
+  nodup? (x ∷ xs) with x ∈? xs
+  ... | yes pres = no (λ { (¬pres nd∷ H) → ¬pres pres })
+  ... | no ¬pres with nodup? xs
+  ... | yes ih = yes (¬pres nd∷ ih)
+  ... | no ¬ih = no (λ { (¬pres nd∷ H) → ¬ih H })
 
   data GoesTo {A B : Set} (k : A) : B → List (A × B) → Set where
     Z : ∀ {v xs} → GoesTo k v ((k , v) ∷ xs)
