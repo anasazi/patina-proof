@@ -9,7 +9,7 @@ open import Empty
 open import Unit
 
 open import Bool
-module PatinaOverview {Life : Set} {{EqLife : Eq Life}} where
+module PatinaOverview {SId Life : Set} {{EqLife : Eq Life}} {{EqSId : Eq SId}} where
 
 -- TODO need to add lifetime relation well-formed conditions everywhere we use them
 
@@ -196,18 +196,74 @@ data Mut : Set where
   imm : Mut
   mut : Mut
 
+add-param-lifes : LifeRel → List Life → LifeRel
+add-param-lifes Λ ℓs = foldr _&_ Λ (map top ℓs)
+
 -- types are parameterized by the lifetimes in scope (can't use undefined lifetimes)
 -- structs are rendered as structural types here
 data Type (Λ : LifeRel) : Set where
+  int : Type Λ
+  box : Type Λ → Type Λ
+  ref : ∀ {ℓ} → Λ ⊢ ℓ defined → Mut → Type Λ → Type Λ
+  opt : Type Λ → Type Λ
+  struct : SId → (ℓs : List Life) → List (Type (add-param-lifes Λ ℓs)) → Type Λ
+  svar : SId → Type Λ
+
 -- type well-formedness mostly involves making sure structs are well formed (requires well-formed lifetime relation)
-data _⊢_wf-type : (Λ : LifeRel) → Type Λ → Set where
+data _,_⊢_wf-type : (Λ : LifeRel) → List SId → Type Λ → Set where
+  int-wf : ∀ {Λ srs} → Λ , srs ⊢ int wf-type
+  box-wf : ∀ {Λ srs τ} → Λ , srs ⊢ τ wf-type → Λ , srs ⊢ box τ wf-type
+  ref-wf : ∀ {Λ srs ℓ μ τ}
+         → ⊢ Λ wf-rel -- Λ is a real relation
+         → (pf : Λ ⊢ ℓ defined) -- ℓ is a real lifetime
+         → Λ , srs ⊢ τ wf-type -- τ is a real type
+         → Λ , srs ⊢ (ref pf μ τ) wf-type
+  opt-wf : ∀ {Λ srs τ} → Λ , srs ⊢ τ wf-type → Λ , srs ⊢ opt τ wf-type
+  struct-wf : ∀ {x srs ℓs Λ} {τs : List (Type (add-param-lifes Λ ℓs))}
+            -- new relation is well-formed
+            → ⊢ add-param-lifes Λ ℓs wf-rel
+            -- struct name is fresh
+            → NoDup (x ∷ srs)
+            -- fields are well-formed when lifetime params + struct name are in scope
+            → All (λ τ → foldr _&_ Λ (map top ℓs) , x ∷ srs ⊢ τ wf-type) τs
+            → Λ , srs ⊢ (struct x ℓs τs) wf-type
+  -- struct variable is well-formed if it's a defined variable
+  svar-wf : ∀ {x srs Λ} → x ∈ srs → Λ , srs ⊢ svar x wf-type
+
+private
+  module TypedEx where
+    postulate sid-List : SId
+    postulate sid-other : SId
+    postulate life-static : Life
+    postulate list≢other : ¬ (sid-other ≡ sid-List)
+
+    test-Λ : LifeRel
+    test-Λ = top life-static
+
+    test-List : Type test-Λ
+    test-List = struct sid-List [] ([ int ,, opt (box (svar sid-List)) ])
+
+    test-List-wf : test-Λ , [] ⊢ test-List wf-type
+    test-List-wf = struct-wf top ((λ ()) nd∷ nd[])
+                     (int-wf a∷ (opt-wf (box-wf (svar-wf (aZ refl))) a∷ a[]))
+
+    test-bad : Type test-Λ
+    test-bad = struct sid-List [] ([ int ,, opt (box (svar sid-other)) ])
+
+    test-bad-¬wf : ¬ (test-Λ , [] ⊢ test-bad wf-type)
+    test-bad-¬wf (struct-wf wfΛ wfx (wf-int a∷ (opt-wf (box-wf (svar-wf (aZ eq))) a∷ a[]))) = list≢other eq
+    test-bad-¬wf (struct-wf wfΛ wfx (wf-int a∷ (opt-wf (box-wf (svar-wf (aS ()))) a∷ a[])))
+
+    test-bad-wf : test-Λ , [ sid-other ] ⊢ test-bad wf-type
+    test-bad-wf = struct-wf top ((λ { (aZ x) → list≢other (sym x) ; (aS ()) }) nd∷ ((λ ()) nd∷ nd[]))
+                            (int-wf a∷ (opt-wf (box-wf (svar-wf (aS (aZ refl)))) a∷ a[]))
 
 -- Context mapping variables to types (we will be using de Bruijn indicies for variables)
 Context : LifeRel → Set
 Context = List ∘ List ∘ Type
 -- contexts are well-formed if all their types are well-formed
-_⊢_wf-cxt : (Λ : LifeRel) → Context Λ → Set
-Λ ⊢ Γ wf-cxt = All (All (λ t → Λ ⊢ t wf-type)) Γ
+_,_⊢_wf-cxt : (Λ : LifeRel) → List SId → Context Λ → Set
+Λ , srs ⊢ Γ wf-cxt = All (All (λ t → Λ , srs ⊢ t wf-type)) Γ
 
 -- Addresses are references to slots of memory
 module Address where
@@ -345,12 +401,12 @@ config-Γ C = fst (snd (snd (snd C)))
 finished : {Λ : LifeRel} → Config Λ → Set
 finished (_ , (H , (_ , (_ , St)))) = H ≡ [] × St ≡ []
 -- config typing is simply combining all the typing and well-formed conditions
-config-type : (Λ : LifeRel) → (C : Config Λ) → Lifes → Deinit Λ (config-Γ C) → Bank Λ (config-Γ C) → Deinit Λ (config-Γ C) → Bank Λ (config-Γ C) → Set
-config-type Λ (P , (H , (V , (Γ , St)))) L Δ B Δ′ B′ = ⊢ P ok-prgm -- program is ok
-                                                     × Λ , Γ , V , Δ ⊢ H wf-heap -- heap is ok
-                                                     × Λ , Γ , H ⊢ V wf-locs -- addr map is ok
-                                                     × Λ ⊢ Γ wf-cxt -- context is ok
-                                                     × stack-type Λ Γ L B Δ St B′ Δ′ -- stack type checks
+config-type : (Λ : LifeRel) → List SId → (C : Config Λ) → Lifes → Deinit Λ (config-Γ C) → Bank Λ (config-Γ C) → Deinit Λ (config-Γ C) → Bank Λ (config-Γ C) → Set
+config-type Λ srs (P , (H , (V , (Γ , St)))) L Δ B Δ′ B′ = ⊢ P ok-prgm -- program is ok
+                                                         × Λ , Γ , V , Δ ⊢ H wf-heap -- heap is ok
+                                                         × Λ , Γ , H ⊢ V wf-locs -- addr map is ok
+                                                         × Λ , srs ⊢ Γ wf-cxt -- context is ok
+                                                         × stack-type Λ Γ L B Δ St B′ Δ′ -- stack type checks
 
 -- evalutation is defined on configurations
 {- ⟶ = \--> -}
@@ -358,18 +414,18 @@ data _⊢_⟶_⊢_ : (Λ : LifeRel) → Config Λ → (Λ′ : LifeRel) → Conf
 
 -- given typing and evalutation for configurations, our soundness conditions are:
 
-progress : ∀ {Λ L} {C : Config Λ} {Δ Δ′ : Deinit Λ (config-Γ C)} {B B′ : Bank Λ (config-Γ C)} 
-         → config-type Λ C L Δ B Δ′ B′ -- if the configuration typechecks, then either...
+progress : ∀ {Λ srs L} {C : Config Λ} {Δ Δ′ : Deinit Λ (config-Γ C)} {B B′ : Bank Λ (config-Γ C)}
+         → config-type Λ srs C L Δ B Δ′ B′ -- if the configuration typechecks, then either...
          → finished C -- it is the finish configuration OR
          + Σ (Config Λ) (λ C′ → Λ ⊢ C ⟶ Λ ⊢ C′) -- there exists some new configuration we can step to
 progress = {!!}
 
-preservation : ∀ {Λ L} {C C′ : Config Λ} {Δ Δ′ : Deinit Λ (config-Γ C)} {B B′ : Bank Λ (config-Γ C)} 
-             → config-type Λ C L Δ B Δ′ B′ -- if C typechecks with outputs Δ′ and B′ ...
+preservation : ∀ {Λ srs L} {C C′ : Config Λ} {Δ Δ′ : Deinit Λ (config-Γ C)} {B B′ : Bank Λ (config-Γ C)}
+             → config-type Λ srs C L Δ B Δ′ B′ -- if C typechecks with outputs Δ′ and B′ ...
              → Λ ⊢ C ⟶ Λ ⊢ C′ -- and C steps to C′
              → Σ (Deinit Λ (config-Γ C′) × Bank Λ (config-Γ C′) × Deinit Λ (config-Γ C′) × Bank Λ (config-Γ C′)) -- then there exists Δ′′, B′′, Δ′′′, and B′′′ such that
-                 (λ {(Δ′′ , (B′′ , (Δ′′′ , B′′′))) → config-type Λ C′ L Δ′′ B′′ Δ′′′ B′′′ -- C′ typecheckes with the *′′ as inputs and the *′′′ as outputs
-                                                   × deinit-equiv Λ (config-Γ C) Δ′ (config-Γ C′) Δ′′′ -- and Δ′ is equivalent to Δ‌′′′
+                 (λ {(Δ′′ , (B′′ , (Δ′′′ , B′′′))) → config-type Λ srs C′ L Δ′′ B′′ Δ′′′ B′′′ -- C′ typecheckes with the *′′ as inputs and the *′′′ as outputs
+                                                   × deinit-equiv Λ (config-Γ C) Δ′ (config-Γ C′) Δ′′′ -- and Δ′ is equivalent to Δ′′′
                                                    × bank-equiv Λ (config-Γ C) B′ (config-Γ C′) B′′′ }) -- and B′ is equivalent to B′′′
 preservation = {!!}
 
