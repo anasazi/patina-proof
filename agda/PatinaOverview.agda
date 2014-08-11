@@ -1,17 +1,5 @@
 open import Common
-{-
-open import Equality
-open import List
-open import Function {- _∘_ and _$_ are dependent versions of Haskell's (.) and ($) -}
-open import Nat
-open import Decidable
-open import Product
-open import Sum
-open import Empty
-open import Unit
 
-open import Bool
--}
 module PatinaOverview {SId Life : Set} {{EqLife : Eq Life}} {{EqSId : Eq SId}} where
 
 -- TODO need to add lifetime relation well-formed conditions everywhere we use them
@@ -140,7 +128,7 @@ sublife? (Λ1 & Λ2) ℓ1 ℓ2 | yes (and def1) with sublife? Λ1 ℓ1 ℓ2 | su
 -- same with the second half
 ... | no ¬ih1 | yes ih2 = yes (and (inr ih2))
 -- if neither side can prove it, then we cannot either
-... | no ¬ih1 | no ¬ih2 = no (λ {(and pf) → match ¬ih1 ¬ih2 pf})
+... | no ¬ih1 | no ¬ih2 = no (λ {(and pf) → +match ¬ih1 ¬ih2 pf})
 -- if the first lifetime isn't defined by the relation, then it definitely isn't related
 sublife? Λ ℓ1 ℓ2 | no ¬def1 = no (contrapositive sub=>def-1 ¬def1)
 
