@@ -1,5 +1,5 @@
 open import Common
-module Life where
+module Id.Life where
 
 data Life : Set where
   static : Life

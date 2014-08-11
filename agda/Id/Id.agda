@@ -1,5 +1,5 @@
 open import Common
-module Id where
+module Id.Id where
 
 data ID : Set where
   iD : ℕ → ID
