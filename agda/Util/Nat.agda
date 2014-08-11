@@ -1,8 +1,8 @@
-open import Function
-open import Decidable
-open import Equality
-open import Bool
-module Nat where
+open import Util.Function
+open import Util.Decidable
+open import Util.Equality
+open import Util.Bool
+module Util.Nat where
   data ℕ : Set where
     Z : ℕ
     S : ℕ → ℕ

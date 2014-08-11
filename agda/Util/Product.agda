@@ -1,4 +1,4 @@
-module Product where
+module Util.Product where
 
 record Σ (A : Set) (B : A → Set) : Set where
   constructor _,_

@@ -1,4 +1,4 @@
-module Unit where
+module Util.Unit where
 
 record ⊤ : Set where
   constructor tt

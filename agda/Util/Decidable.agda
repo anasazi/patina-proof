@@ -1,6 +1,6 @@
-open import Empty
-open import Level
-module Decidable where
+open import Util.Empty
+open import Util.Level
+module Util.Decidable where
   data Dec {a} (P : Set a) : Set a where
     yes : P → Dec P
     no  : ¬ P → Dec P 

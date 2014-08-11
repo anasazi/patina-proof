@@ -1,4 +1,4 @@
-module Level where
+module Util.Level where
 
 open import Agda.Primitive public
   using (Level ; _⊔_)

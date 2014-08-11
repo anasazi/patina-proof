@@ -1,4 +1,4 @@
-module Empty where
+module Util.Empty where
 
 data ⊥ : Set where
 

@@ -1,11 +1,11 @@
-open import Nat
-open import Equality
-open import Decidable
-open import Product
-open import Function
-open import Level
-open import Empty
-module List where
+open import Util.Nat
+open import Util.Equality
+open import Util.Decidable
+open import Util.Product
+open import Util.Function
+open import Util.Level
+open import Util.Empty
+module Util.List where
   infixr 5 _∷_
   data List {a} (A : Set a) : Set a where
     []  : List A

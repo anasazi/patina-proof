@@ -1,10 +1,10 @@
-open import Nat
-open import Equality
-open import Decidable
-open import Fin
-open import Product
+open import Util.Nat
+open import Util.Equality
+open import Util.Decidable
+open import Util.Fin
+open import Util.Product
 
-module Vec where
+module Util.Vec where
 
 infixr 5 _∷_
 data Vec (A : Set) : ℕ → Set where
@@ -45,7 +45,7 @@ foldr f z [] = z
 foldr f z (x ∷ xs) = f x (foldr f z xs)
 
 sum : ∀ {n} → Vec ℕ n → ℕ
-sum = foldr _+_ 0
+sum = foldr plus 0
 
 --infix 3 _∈_
 _∈_ : ∀ {A n} (x : A) → Vec A n → Set
@@ -60,7 +60,7 @@ x ∈? (y ∷ xs) | no _ | yes pf = yes (S pf)
 x ∈? (y ∷ xs) | no ¬eq | no ¬rec = no (λ { (Z h) → ¬eq h
                                          ; (S h) → ¬rec h})
 
-_∪_ : ∀ {A n} {{EqA : Eq A}} → A → Vec A n → Σ ℕ ** (Vec A)
+_∪_ : ∀ {A n} {{EqA : Eq A}} → A → Vec A n → Σ ℕ (Vec A)
 x ∪ xs with x ∈? xs
 x ∪ xs | yes pf = _ , xs
 x ∪ xs | no ¬pf = S _ , (x ∷ xs)

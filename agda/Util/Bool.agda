@@ -1,6 +1,6 @@
-open import Empty
-open import Unit
-module Bool where
+open import Util.Empty
+open import Util.Unit
+module Util.Bool where
 
 data Bool : Set where
   true : Bool

@@ -1,5 +1,5 @@
-open import Level
-module Sum where
+open import Util.Level
+module Util.Sum where
 
 infixr 2 _+_
 data _+_ {a b} (A : Set a) (B : Set b) : Set (a ⊔ b) where

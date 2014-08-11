@@ -1,19 +1,16 @@
-open import Equality
-open import Decidable
-open import Nat
-open import Function
+open import Common
 module Id where
 
-data Id : Set where
-  id : ℕ → Id
+data ID : Set where
+  iD : ℕ → ID
 
-id-inj : ∀ {a b} → id a ≡ id b → a ≡ b
-id-inj refl = refl
+iD-inj : ∀ {a b} → iD a ≡ iD b → a ≡ b
+iD-inj refl = refl
 
-_=Id=_ : (a b : Id) → Dec (a ≡ b)
-id a =Id= id b with a == b
-... | yes p = yes (cong id p)
-... | no p = no (p ∘ id-inj)
+_=ID=_ : (a b : ID) → Dec (a ≡ b)
+iD a =ID= iD b with a == b
+... | yes p = yes (cong iD p)
+... | no p = no (p ∘ iD-inj)
 
-EqId : Eq Id
-EqId = record { _==_ = _=Id=_ }
+EqId : Eq ID
+EqId = record { _==_ = _=ID=_ }

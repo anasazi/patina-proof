@@ -1,6 +1,6 @@
-open import Decidable
-open import Level
-module Equality where
+open import Util.Decidable
+open import Util.Level
+module Util.Equality where
   infix 4 _≡_
   data _≡_ {α} {A : Set α} (x : A) : A → Set α where
     refl : x ≡ x

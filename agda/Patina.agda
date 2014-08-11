@@ -1,6 +1,8 @@
 module Patina where
 
 -- general stuff
+open import Common
+{-
 open import Function
 open import Empty
 open import Unit
@@ -9,9 +11,10 @@ open import Product
 open import Decidable
 open import Equality
 open import Nat
+-}
 --open import List
-open import Vec
-open import Fin
+open import Util.Vec
+open import Util.Fin
 
 -- patina stuff
 open import Id
@@ -37,8 +40,8 @@ module Types where
         → (vℓs : Vec (Var × Life) n1) -- a vector of variance / lifetime pairs
         → (τs : Vec Type n2) --- and a vector of types
         → Type 
-    var : Id → Type -- type variables (for recursive types)
-    μ : Id → Type → Type -- recursive types
+    var : ID → Type -- type variables (for recursive types)
+    μ : ID → Type → Type -- recursive types
 
   -- test structs from redex model
   srs-A : Type

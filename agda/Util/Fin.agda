@@ -1,14 +1,14 @@
-open import Nat
-open import Decidable
-open import Equality
-open import Function
-open import Product
-open import Bool
-module Fin where
+open import Util.Nat
+open import Util.Decidable
+open import Util.Equality
+open import Util.Function
+open import Util.Product
+open import Util.Bool
+module Util.Fin where
 
 data Fin : ℕ → Set where
-  fZ : ∀ {n} → Fin (1 + n)
-  fS : ∀ {n} → Fin n → Fin (1 + n)
+  fZ : ∀ {n} → Fin (S n)
+  fS : ∀ {n} → Fin n → Fin (S n)
 
 fS-inj : ∀ {n} {a b : Fin n} → fS a ≡ fS b → a ≡ b
 fS-inj refl = refl

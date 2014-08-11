@@ -1,3 +1,5 @@
+open import Common
+{-
 open import Equality
 open import List
 open import Function {- _∘_ and _$_ are dependent versions of Haskell's (.) and ($) -}
@@ -9,6 +11,7 @@ open import Empty
 open import Unit
 
 open import Bool
+-}
 module PatinaOverview {SId Life : Set} {{EqLife : Eq Life}} {{EqSId : Eq SId}} where
 
 -- TODO need to add lifetime relation well-formed conditions everywhere we use them

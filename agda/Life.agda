@@ -1,7 +1,4 @@
-open import Decidable
-open import Equality
-open import Function
-open import Nat
+open import Common
 module Life where
 
 data Life : Set where

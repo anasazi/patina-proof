@@ -1,5 +1,5 @@
-open import Level
-module Function where
+open import Util.Level
+module Util.Function where
 
 infixr 9 _∘_
 _∘_ : {α β γ : Level} {A : Set α} {B : A → Set β} {C : ∀ a → B a → Set γ}
