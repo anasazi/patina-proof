@@ -16,3 +16,12 @@ record Var : Set where
 
 EqVar : Eq Var
 EqVar = record { _==_ = ==Var }
+
+test-i = `v 0
+test-p = `v 1
+test-a = `v 2
+test-b = `v 3
+test-c = `v 4
+test-q = `v 5
+test-r = `v 6
+test-s = `v 7

@@ -54,35 +54,35 @@ module Util.List where
   flatten = foldr _++_ []
 
   data All {a b} {A : Set a} (P : A → Set b) : List A → Set (a ⊔ b) where
-    a[]  : All P []
-    _a∷_ : ∀ {x xs} → P x → All P xs → All P (x ∷ xs)
+    []  : All P []
+    _∷_ : ∀ {x xs} → P x → All P xs → All P (x ∷ xs)
 
   all? : ∀ {a b} {A : Set a} {P : A → Set b} (p? : Decidable P) → Decidable (All P)
-  all? p? [] = yes a[]
+  all? p? [] = yes []
   all? p? (x ∷ xs) with p? x | all? p? xs
-  all? p? (x ∷ xs) | yes px | yes pxs = yes (px a∷ pxs)
-  all? p? (x ∷ xs) | yes px | no ¬pxs = no (λ {(Hx a∷ Hxs) → ¬pxs Hxs})
-  all? p? (x ∷ xs) | no ¬px | pxs = no (λ {(Hx a∷ Hxs) → ¬px Hx})
+  all? p? (x ∷ xs) | yes px | yes pxs = yes (px ∷ pxs)
+  all? p? (x ∷ xs) | yes px | no ¬pxs = no (λ {(Hx ∷ Hxs) → ¬pxs Hxs})
+  all? p? (x ∷ xs) | no ¬px | pxs = no (λ {(Hx ∷ Hxs) → ¬px Hx})
 
   mapAll : ∀ {a} {A : Set a} {xs} {P Q : A → Set} (f : ∀ {x} → P x → Q x) → All P xs → All Q xs
-  mapAll f a[] = a[]
-  mapAll f (x a∷ xs) = f x a∷ mapAll f xs
+  mapAll f [] = []
+  mapAll f (x ∷ xs) = f x ∷ mapAll f xs
 
   data Any {a b} {A : Set a} (P : A → Set b) : List A → Set (a ⊔ b) where
-    aZ : ∀ {x xs} → P x → Any P (x ∷ xs)
-    aS : ∀ {x xs} → Any P xs → Any P (x ∷ xs)
+    Z : ∀ {x xs} → P x → Any P (x ∷ xs)
+    S : ∀ {x xs} → Any P xs → Any P (x ∷ xs)
 
   any? : ∀ {a b} {A : Set a} {P : A → Set b} (p? : Decidable P) → Decidable (Any P)
   any? p? [] = no (λ ())
   any? p? (x ∷ xs) with p? x
-  any? p? (x ∷ xs) | yes px = yes (aZ px)
+  any? p? (x ∷ xs) | yes px = yes (Z px)
   any? p? (x ∷ xs) | no ¬px with any? p? xs
-  any? p? (x ∷ xs) | no ¬px | yes rec = yes (aS rec)
-  any? p? (x ∷ xs) | no ¬px | no ¬rec = no (λ {(aZ px) → ¬px px ; (aS px) → ¬rec px})
+  any? p? (x ∷ xs) | no ¬px | yes rec = yes (S rec)
+  any? p? (x ∷ xs) | no ¬px | no ¬rec = no (λ {(Z px) → ¬px px ; (S px) → ¬rec px})
 
   extract : ∀ {a} {A : Set a} {xs} {P : A → Set} → Any P xs → A
-  extract (aZ {x} pf) = x
-  extract (aS pf) = extract pf
+  extract (Z {x} pf) = x
+  extract (S pf) = extract pf
 
   infix 3 _∈_
   _∈_ : ∀ {a} {A : Set a} (x : A) → List A → Set a
@@ -91,9 +91,9 @@ module Util.List where
   _∈?_ : ∀ {a} {A : Set a} {{EqA : Eq A}} (x : A) (xs : List A) → Dec (x ∈ xs)
   x ∈? [] = no (λ ())
   x ∈? (y ∷ xs) with x == y | x ∈? xs
-  .y ∈? (y ∷ xs) | yes refl | there = yes (aZ refl)
-  x ∈? (y ∷ xs) | no ¬here | yes there = yes (aS there)
-  x ∈? (y ∷ xs) | no ¬here | no ¬there = no (λ { (aZ h) → ¬here h ; (aS h) → ¬there h })
+  .y ∈? (y ∷ xs) | yes refl | there = yes (Z refl)
+  x ∈? (y ∷ xs) | no ¬here | yes there = yes (S there)
+  x ∈? (y ∷ xs) | no ¬here | no ¬there = no (λ { (Z h) → ¬here h ; (S h) → ¬there h })
 
   infix 3 _⊆_
   _⊆_ : ∀ {a} {A : Set a} (xs ys : List A) → Set a
@@ -126,14 +126,14 @@ module Util.List where
   KeyIn? : ∀ {A B} {{EqA : Eq A}} (k : A) → (kvs : List (A × B)) → Dec (KeyIn k kvs)
   KeyIn? k [] = no (λ ())
   KeyIn? k (kv ∷ kvs) with fst kv == k
-  KeyIn? k (kv ∷ kvs) | yes eq = yes (aZ eq)
+  KeyIn? k (kv ∷ kvs) | yes eq = yes (Z eq)
   KeyIn? k (kv ∷ kvs) | no ¬eq with KeyIn? k kvs
-  KeyIn? k (kv ∷ kvs) | no ¬eq | yes ih = yes (aS ih)
-  KeyIn? k (kv ∷ kvs) | no ¬eq | no ¬ih = no (λ { (aZ h) → ¬eq h ; (aS h) → ¬ih h})
+  KeyIn? k (kv ∷ kvs) | no ¬eq | yes ih = yes (S ih)
+  KeyIn? k (kv ∷ kvs) | no ¬eq | no ¬ih = no (λ { (Z h) → ¬eq h ; (S h) → ¬ih h})
 
   lookup : ∀ {A B} {{EqA : Eq A}} {k : A} → {kvs : List (A × B)} → KeyIn k kvs → B
-  lookup (aZ {._ , b} refl) = b
-  lookup (aS p) = lookup p
+  lookup (Z {._ , b} refl) = b
+  lookup (S p) = lookup p
 
   KeyIn* : {A B : Set} → A → List (List (A × B)) → Set
   KeyIn* k kvss = Any (KeyIn k) kvss
@@ -141,18 +141,18 @@ module Util.List where
   KeyIn?* : {A B : Set} {{EqA : Eq A}} (k : A) → (kvss : List (List (A × B))) → Dec (KeyIn* k kvss)
   KeyIn?* k [] = no (λ ())
   KeyIn?* k (kvs ∷ kvss) with KeyIn? k kvs
-  KeyIn?* k (kvs ∷ kvss) | yes here = yes (aZ here)
+  KeyIn?* k (kvs ∷ kvss) | yes here = yes (Z here)
   KeyIn?* k (kvs ∷ kvss) | no ¬here with KeyIn?* k kvss
-  KeyIn?* k (kvs ∷ kvss) | no ¬here | yes there = yes (aS there)
-  KeyIn?* k (kvs ∷ kvss) | no ¬here | no ¬there = no (λ { (aZ h) → ¬here h ; (aS h) → ¬there h})
+  KeyIn?* k (kvs ∷ kvss) | no ¬here | yes there = yes (S there)
+  KeyIn?* k (kvs ∷ kvss) | no ¬here | no ¬there = no (λ { (Z h) → ¬here h ; (S h) → ¬there h})
 
   lookup* : ∀ {A B} {{EqA : Eq A}} {k : A} {kvss : List (List (A × B))} → KeyIn* k kvss → B
-  lookup* (aZ pf) = lookup pf
-  lookup* (aS pf) = lookup* pf
+  lookup* (Z pf) = lookup pf
+  lookup* (S pf) = lookup* pf
 
   update : ∀ {A B} (k : A) (v : B) kvs → KeyIn k kvs → List (A × B)
-  update k v .(x ∷ xs) (aZ {x} {xs} x₁) = k , v ∷ xs
-  update k v .(x ∷ xs) (aS {x} {xs} loc) = x ∷ update k v xs loc
+  update k v .(x ∷ xs) (Z {x} {xs} x₁) = k , v ∷ xs
+  update k v .(x ∷ xs) (S {x} {xs} loc) = x ∷ update k v xs loc
 
   data Update {A B : Set} (k : A) (v : B) : List (A × B) → List (A × B) → Set where
     Z : ∀ {v′ kvs} → Update k v ((k , v′) ∷ kvs) ((k , v) ∷ kvs)

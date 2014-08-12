@@ -16,3 +16,7 @@ record Struct : Set where
 
 EqVar : Eq Struct
 EqVar = record { _==_ = ==Struct }
+
+test-A = `s 0
+test-B = `s 1
+test-C = `s 2

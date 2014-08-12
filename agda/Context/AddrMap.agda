@@ -8,5 +8,9 @@ record VarMap : Set where
   field
     var : Var
     addr : Addr
+open VarMap
 
 VMap = List (List VarMap)
+
+_⊢_⇒_ : VMap → Var → Addr → Set
+V ⊢ x ⇒ α = Any (Any (_≡_ x ∘ var)) V

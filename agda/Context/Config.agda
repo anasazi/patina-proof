@@ -1,4 +1,4 @@
-open import Syntax.Program
+open import Context.Program
 open import Context.Heap
 open import Context.AddrMap
 open import Context.TypeMap

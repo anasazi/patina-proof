@@ -18,3 +18,5 @@ _=Life=_ : (a b : Life) → Dec (a ≡ b)
 
 EqLife : Eq Life
 EqLife = record { _==_ = _=Life=_ }
+
+test-b1 = ` 0
