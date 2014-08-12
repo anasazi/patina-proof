@@ -20,3 +20,5 @@ EqVar = record { _==_ = ==Struct }
 test-A = `s 0
 test-B = `s 1
 test-C = `s 2
+test-D = `s 3
+test-E = `s 4

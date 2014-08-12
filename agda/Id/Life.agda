@@ -20,3 +20,4 @@ EqLife : Eq Life
 EqLife = record { _==_ = _=Life=_ }
 
 test-b1 = ` 0
+test-l0 = ` 1
