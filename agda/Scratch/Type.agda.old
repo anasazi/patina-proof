@@ -1,0 +1,441 @@
+open import Common
+open import Util.Bool
+
+module Type where
+
+data Mut : Set where
+  imm : Mut
+  mut : Mut
+
+data Vari : Set where
+  cov : Vari
+  con : Vari
+  inv : Vari
+
+-- 𝔹ℂℙℚℝℤ  
+
+data Life (ℙ : ℕ) (ℚ : ℕ) : Set where
+  var : Fin ℚ → Life ℙ ℚ
+  static : Life ℙ ℚ
+  val : Fin ℙ → Life ℙ ℚ
+
+var-inj : ∀ {ℙ ℚ a b} → var {ℙ} {ℚ} a ≡ var b → a ≡ b
+var-inj refl = refl
+val-inj : ∀ {ℙ ℚ a b} → val {ℙ} {ℚ} a ≡ val b → a ≡ b
+val-inj refl = refl
+
+==L : ∀ {ℙ ℚ} (a b : Life ℙ ℚ) → Dec (a ≡ b)
+==L (var a) (var b) with a == b
+==L (var a) (var .a) | yes refl = yes refl
+==L (var a) (var b) | no neq = no (neq ∘ var-inj)
+==L (var a) static = no (λ ())
+==L (var a) (val b) = no (λ ())
+==L static (var b) = no (λ ())
+==L static static = yes refl
+==L static (val b) = no (λ ())
+==L (val a) (var b) = no (λ ())
+==L (val a) static = no (λ ())
+==L (val a) (val b) with a == b
+==L (val a) (val .a) | yes refl = yes refl
+==L (val a) (val b) | no neq = no (neq ∘ val-inj)
+
+EqLife : ∀ {ℙ ℚ} → Eq (Life ℙ ℚ)
+EqLife = record { _==_ = ==L }
+
+record TVar : Set where
+  constructor `
+  field
+    key : ℕ
+
+`-inj : ∀ {a b} → ` a ≡ ` b → a ≡ b
+`-inj refl = refl
+
+==TV : (a b : TVar) → Dec (a ≡ b)
+==TV (` a) (` b) with a == b
+==TV (` a) (` .a) | yes refl = yes refl
+==TV (` a) (` b) | no neq = no (neq ∘ `-inj)
+
+EqTVar : Eq TVar
+EqTVar = record { _==_ = ==TV }
+
+data Type : (ℙ ℚ : ℕ) → Set where
+  int : ∀ {ℙ ℚ} → Type ℙ ℚ
+  ~ : ∀ {ℙ ℚ} → Type ℙ ℚ → Type ℙ ℚ
+  & : ∀ {ℙ ℚ} → Life ℙ ℚ → Mut → Type ℙ ℚ → Type ℙ ℚ
+  opt : ∀ {ℙ ℚ} → Type ℙ ℚ → Type ℙ ℚ
+  struct : ∀ {ℙ ℚ} → (n : ℕ) → Vec (Type ℙ ℚ) n → Type ℙ ℚ
+  tvar : ∀ {ℙ ℚ} → TVar → Type ℙ ℚ
+  μ : ∀ {ℙ ℚ} → TVar → Type ℙ ℚ → Type ℙ ℚ
+  -- forget existing lifetimes
+  ∅ℓ : ∀ {ℙ ℚ} → Type 0 0 → Type ℙ ℚ
+  λℓ : ∀ {ℙ ℚ} → Type ℙ (S ℚ) → Type ℙ ℚ
+  _$ℓ_ : ∀ {ℙ ℚ} → Type ℙ (S ℚ) → Life ℙ ℚ → Type ℙ ℚ
+
+shift-ℓval : ∀ {ℙ ℚ} (amt cutoff : ℕ) → Type ℙ ℚ → Type (plus ℙ amt) ℚ
+shift-ℓval d c int = int
+shift-ℓval d c (~ τ) = ~ (shift-ℓval d c τ)
+shift-ℓval d c (& (var ℓ) m τ) = & (var ℓ) m (shift-ℓval d c τ)
+shift-ℓval d c (& static m τ) = & static m (shift-ℓval d c τ)
+shift-ℓval d c (& (val ℓ) m τ) with lessNat (asℕ ℓ) c
+shift-ℓval d c (& (val ℓ) m τ) | true = & (val (expand ℓ d)) m (shift-ℓval d c τ)
+shift-ℓval d c (& (val ℓ) m τ) | false = & (val (raise′ ℓ d)) m (shift-ℓval d c τ)
+shift-ℓval d c (opt τ) = opt (opt (shift-ℓval d c τ))
+shift-ℓval d c (struct n τs) = {!!}
+shift-ℓval d c (tvar X) = tvar X
+shift-ℓval d c (μ X τ) = μ X (shift-ℓval d c τ)
+shift-ℓval d c (∅ℓ τ) = {!!}
+shift-ℓval d c (λℓ τ) = {!!}
+shift-ℓval d c (τ $ℓ ℓ) = {!!}
+
+data _≣_ {ℙ ℚ} : Type ℙ ℚ → Type ℙ ℚ → Set where
+  --≣-refl : ∀ {τ} → τ ≣ τ
+  --≣-sym : ∀ {a b} → a ≣ b → b ≣ a
+  --≣-trans : ∀ {a b c} → a ≣ b → b ≣ c → a ≣ c
+  ≣-int : int ≣ int
+  ≣-~ : ∀ {τ₁ τ₂} → τ₁ ≣ τ₂ → ~ τ₁ ≣ ~ τ₂
+  ≣-& : ∀ {ℓ₁ ℓ₂ m₁ m₂ τ₁ τ₂} → ℓ₁ ≡ ℓ₂ → m₁ ≡ m₂ → τ₁ ≣ τ₂ → & ℓ₁ m₁ τ₁ ≣ & ℓ₂ m₂ τ₂
+  ≣-opt : ∀ {τ₁ τ₂} → τ₁ ≣ τ₂ → opt τ₁ ≣ opt τ₂
+  ≣-struct : ∀ {n τs₁ τs₂}
+           → All (λ ττ → fst ττ ≣ snd ττ) (zip τs₁ τs₂)
+           → struct n τs₁ ≣ struct n τs₂
+  ≣-tvar : ∀ {T₁ T₂} → T₁ ≡ T₂ → tvar T₁ ≣ tvar T₂
+  ≣-μ : ∀ {T₁ T₂ τ₁ τ₂} → T₁ ≡ T₂ → τ₁ ≣ τ₂ → μ T₁ τ₁ ≣ μ T₂ τ₂
+  ≣-∅ℓ : ∀ {τ₁ τ₂} → τ₁ ≣ τ₂ → ∅ℓ τ₁ ≣ ∅ℓ τ₂
+  ≣-λℓ : ∀ {τ₁ τ₂} → τ₁ ≣ τ₂ → λℓ τ₁ ≣ λℓ τ₂
+  ≣-$ℓ : ∀ {τ₁ τ₂ ℓ₁ ℓ₂} → τ₁ ≣ τ₂ → ℓ₁ ≡ ℓ₂ → (τ₁ $ℓ ℓ₁) ≣ (τ₂ $ℓ ℓ₂)
+  ≣-$λ : ∀ {τ ℓ} → (λℓ τ $ℓ ℓ) ≣ {!!}
+
+{-
+~-inj : ∀ {ℙ ℚ} {a b : Type ℙ ℚ} → ~ a ≡ ~ b → a ≡ b
+~-inj refl = refl
+&-inj-1 : ∀ {ℙ ℚ m₁ m₂} {ℓ₁ ℓ₂} {a b : Type ℙ ℚ} → & ℓ₁ m₁ a ≡ & ℓ₂ m₂ b → ℓ₁ ≡ ℓ₂
+&-inj-1 refl = refl
+&-inj-2 : ∀ {ℙ ℚ m₁ m₂} {ℓ₁ ℓ₂} {a b : Type ℙ ℚ} → & ℓ₁ m₁ a ≡ & ℓ₂ m₂ b → a ≡ b
+&-inj-2 refl = refl
+&-inj-3 : ∀ {ℙ ℚ m₁ m₂} {ℓ₁ ℓ₂} {a b : Type ℙ ℚ} → & ℓ₁ m₁ a ≡ & ℓ₂ m₂ b → m₁ ≡ m₂
+&-inj-3 refl = refl
+opt-inj : ∀ {ℙ ℚ} {a b : Type ℙ ℚ} → opt a ≡ opt b → a ≡ b
+opt-inj refl = refl
+struct-inj : ∀ {ℙ ℚ n} {as bs : Vec (Type ℙ ℚ) n}
+           → struct n as ≡ struct n bs
+           → as ≡ bs
+struct-inj refl = refl
+struct-inj-n : ∀ {ℙ ℚ n m} {as : Vec (Type ℙ ℚ) n} {bs : Vec (Type ℙ ℚ) m}
+             → struct n as ≡ struct m bs
+             → n ≡ m
+struct-inj-n refl = refl
+tvar-inj : ∀ {ℙ ℚ a b} → tvar {ℙ} {ℚ} a ≡ tvar b → a ≡ b
+tvar-inj refl = refl
+μ-inj : ∀ {ℙ ℚ T} {a b : Type ℙ ℚ} → μ T a ≡ μ T b → a ≡ b
+μ-inj refl = refl
+μ-inj-tvar : ∀ {ℙ ℚ x y} {a b : Type ℙ ℚ} → μ x a ≡ μ y b → x ≡ y
+μ-inj-tvar refl = refl
+∅ℓ-inj : ∀ {ℙ ℚ a b} → ∅ℓ {ℙ} {ℚ} a ≡ ∅ℓ b → a ≡ b
+∅ℓ-inj refl = refl
+λℓ-inj : ∀ {ℙ ℚ} {a b : Type ℙ (S ℚ)} → λℓ a ≡ λℓ b → a ≡ b
+λℓ-inj refl = refl
+$ℓ-inj : ∀ {ℙ ℚ ℓ} {a b : Type ℙ (S ℚ)} → a $ℓ ℓ ≡ b $ℓ ℓ → a ≡ b
+$ℓ-inj refl = refl
+$ℓ-inj-arg : ∀ {ℙ ℚ ℓ₁ ℓ₂} {a b : Type ℙ (S ℚ)} → a $ℓ ℓ₁ ≡ b $ℓ ℓ₂ → ℓ₁ ≡ ℓ₂
+$ℓ-inj-arg refl = refl
+
+==T : ∀ {ℙ ℚ} → (a b : Type ℙ ℚ) → Dec (a ≡ b)
+==T int int = yes refl
+==T int (~ b) = no (λ ())
+==T int (& x x₁ b) = no (λ ())
+==T int (opt b) = no (λ ())
+==T int (struct n x) = no (λ ())
+==T int (tvar x) = no (λ ())
+==T int (μ x b) = no (λ ())
+==T int (∅ℓ b) = no (λ ())
+==T int (λℓ b) = no (λ ())
+==T int (b $ℓ x) = no (λ ())
+==T (~ a) int = no (λ ())
+==T (~ a) (~ b) with ==T a b
+==T (~ a) (~ .a) | yes refl = yes refl
+==T (~ a) (~ b) | no neq = no (neq ∘ ~-inj)
+==T (~ a) (& x x₁ b) = no (λ ())
+==T (~ a) (opt b) = no (λ ())
+==T (~ a) (struct n x) = no (λ ())
+==T (~ a) (tvar x) = no (λ ())
+==T (~ a) (μ x b) = no (λ ())
+==T (~ a) (∅ℓ b) = no (λ ())
+==T (~ a) (λℓ b) = no (λ ())
+==T (~ a) (b $ℓ x) = no (λ ())
+==T (& x x₁ a) int = no (λ ())
+==T (& x x₁ a) (~ b) = no (λ ())
+==T (& ℓ₁ m₁ a) (& ℓ₂ m₂ b) with ℓ₁ == ℓ₂
+==T (& ℓ₁ imm a) (& .ℓ₁ imm b) | yes refl with ==T a b
+==T (& ℓ₁ imm a) (& .ℓ₁ imm .a) | yes refl | yes refl = yes refl
+==T (& ℓ₁ imm a) (& .ℓ₁ imm b) | yes refl | no neq = no (neq ∘ &-inj-2)
+==T (& ℓ₁ imm a) (& .ℓ₁ mut b) | yes refl = no (λ ())
+==T (& ℓ₁ mut a) (& .ℓ₁ imm b) | yes refl = no (λ ())
+==T (& ℓ₁ mut a) (& .ℓ₁ mut b) | yes refl with ==T a b
+==T (& ℓ₁ mut a) (& .ℓ₁ mut .a) | yes refl | yes refl = yes refl
+==T (& ℓ₁ mut a) (& .ℓ₁ mut b) | yes refl | no neq = no (neq ∘ &-inj-2)
+==T (& ℓ₁ m₁ a) (& ℓ₂ m₂ b) | no ℓneq = no (ℓneq ∘ &-inj-1)
+==T (& x x₁ a) (opt b) = no (λ ())
+==T (& x x₁ a) (struct n x₂) = no (λ ())
+==T (& x x₁ a) (tvar x₂) = no (λ ())
+==T (& x x₁ a) (μ x₂ b) = no (λ ())
+==T (& x x₁ a) (∅ℓ b) = no (λ ())
+==T (& x x₁ a) (λℓ b) = no (λ ())
+==T (& x x₁ a) (b $ℓ x₂) = no (λ ())
+==T (opt a) int = no (λ ())
+==T (opt a) (~ b) = no (λ ())
+==T (opt a) (& x x₁ b) = no (λ ())
+==T (opt a) (opt b) with ==T a b
+==T (opt a) (opt .a) | yes refl = yes refl
+==T (opt a) (opt b) | no neq = no (neq ∘ opt-inj)
+==T (opt a) (struct n x) = no (λ ())
+==T (opt a) (tvar x) = no (λ ())
+==T (opt a) (μ x b) = no (λ ())
+==T (opt a) (∅ℓ b) = no (λ ())
+==T (opt a) (λℓ b) = no (λ ())
+==T (opt a) (b $ℓ x) = no (λ ())
+==T (struct n x) int = no (λ ())
+==T (struct n x) (~ b) = no (λ ())
+==T (struct n x) (& x₁ x₂ b) = no (λ ())
+==T (struct n x) (opt b) = no (λ ())
+==T (struct n₁ as) (struct n₂ bs) with n₁ == n₂
+==T (struct n₁ as) (struct .n₁ bs) | yes refl = {!!}
+==T (struct n₁ as) (struct n₂ bs) | no nneq = no (nneq ∘ struct-inj-n)
+==T (struct n x) (tvar x₁) = no (λ ())
+==T (struct n x) (μ x₁ b) = no (λ ())
+==T (struct n x) (∅ℓ b) = no (λ ())
+==T (struct n x) (λℓ b) = no (λ ())
+==T (struct n x) (b $ℓ x₁) = no (λ ())
+==T (tvar x) int = no (λ ())
+==T (tvar x) (~ b) = no (λ ())
+==T (tvar x) (& x₁ x₂ b) = no (λ ())
+==T (tvar x) (opt b) = no (λ ())
+==T (tvar x) (struct n x₁) = no (λ ())
+==T (tvar a) (tvar b) with a == b
+==T (tvar a) (tvar .a) | yes refl = yes refl
+==T (tvar a) (tvar b) | no neq = no (neq ∘ tvar-inj)
+==T (tvar x) (μ x₁ b) = no (λ ())
+==T (tvar x) (∅ℓ b) = no (λ ())
+==T (tvar x) (λℓ b) = no (λ ())
+==T (tvar x) (b $ℓ x₁) = no (λ ())
+==T (μ x a) int = no (λ ())
+==T (μ x a) (~ b) = no (λ ())
+==T (μ x a) (& x₁ x₂ b) = no (λ ())
+==T (μ x a) (opt b) = no (λ ())
+==T (μ x a) (struct n x₁) = no (λ ())
+==T (μ x a) (tvar x₁) = no (λ ())
+==T (μ x a) (μ y b) with x == y
+==T (μ x a) (μ .x b) | yes refl with ==T a b
+==T (μ x a) (μ .x .a) | yes refl | yes refl = yes refl
+==T (μ x a) (μ .x b) | yes refl | no neq = no (neq ∘ μ-inj)
+==T (μ x a) (μ y b) | no neq = no (neq ∘ μ-inj-tvar)
+==T (μ x a) (∅ℓ b) = no (λ ())
+==T (μ x a) (λℓ b) = no (λ ())
+==T (μ x a) (b $ℓ x₁) = no (λ ())
+==T (∅ℓ a) int = no (λ ())
+==T (∅ℓ a) (~ b) = no (λ ())
+==T (∅ℓ a) (& x x₁ b) = no (λ ())
+==T (∅ℓ a) (opt b) = no (λ ())
+==T (∅ℓ a) (struct n x) = no (λ ())
+==T (∅ℓ a) (tvar x) = no (λ ())
+==T (∅ℓ a) (μ x b) = no (λ ())
+==T (∅ℓ a) (∅ℓ b) with ==T a b
+==T (∅ℓ a) (∅ℓ .a) | yes refl = yes refl
+==T (∅ℓ a) (∅ℓ b) | no neq = no (neq ∘ ∅ℓ-inj)
+==T (∅ℓ a) (λℓ b) = no (λ ())
+==T (∅ℓ a) (b $ℓ x) = no (λ ())
+==T (λℓ a) int = no (λ ())
+==T (λℓ a) (~ b) = no (λ ())
+==T (λℓ a) (& x x₁ b) = no (λ ())
+==T (λℓ a) (opt b) = no (λ ())
+==T (λℓ a) (struct n x) = no (λ ())
+==T (λℓ a) (tvar x) = no (λ ())
+==T (λℓ a) (μ x b) = no (λ ())
+==T (λℓ a) (∅ℓ b) = no (λ ())
+==T (λℓ a) (λℓ b) with ==T a b
+==T (λℓ a) (λℓ .a) | yes refl = yes refl
+==T (λℓ a) (λℓ b) | no neq = no (neq ∘ λℓ-inj)
+==T (λℓ a) (b $ℓ x) = no (λ ())
+==T (a $ℓ x) int = no (λ ())
+==T (a $ℓ x) (~ b) = no (λ ())
+==T (a $ℓ x) (& x₁ x₂ b) = no (λ ())
+==T (a $ℓ x) (opt b) = no (λ ())
+==T (a $ℓ x) (struct n x₁) = no (λ ())
+==T (a $ℓ x) (tvar x₁) = no (λ ())
+==T (a $ℓ x) (μ x₁ b) = no (λ ())
+==T (a $ℓ x) (∅ℓ b) = no (λ ())
+==T (a $ℓ x) (λℓ b) = no (λ ())
+==T (a $ℓ x) (b $ℓ y) with x == y
+==T (a $ℓ x) (b $ℓ .x) | yes refl with ==T a b
+==T (a $ℓ x₁) (.a $ℓ .x₁) | yes refl | yes refl = {!!}
+==T (a $ℓ x₁) (b $ℓ .x₁) | yes refl | no x = {!!}
+==T (a $ℓ x) (b $ℓ y) | no neq = no (neq ∘ $ℓ-inj-arg)
+
+EqType : ∀ {ℙ ℚ} → Eq (Type ℙ ℚ)
+EqType = record { _==_ = ==T }
+-}
+
+-- data Type : (ℓ : ℕ) (Ł : ℕ) → Set where
+--   int : ∀ {ℓ Ł} → Type ℓ Ł
+--   ~ : ∀ {ℓ Ł} → Type ℓ Ł → Type ℓ Ł
+--   & : ∀ {ℓ Ł} → Life ℓ Ł → Mut → Type ℓ Ł → Type ℓ Ł
+--   opt : ∀ {ℓ Ł} → Type ℓ Ł → Type ℓ Ł
+--   struct : ∀ {ℓ Ł} n → Vec (Type ℓ Ł) n → Type ℓ Ł
+--   var : ∀ {ℓ Ł} → TVar → Type ℓ Ł
+--   μ : ∀ {ℓ Ł} → TVar → Type ℓ Ł → Type ℓ Ł
+--   -- we forget all existing lifetimes when we parameterize a struct
+--   λℓ : ∀ {ℓ Ł} → (n : ℕ) → Type 0 n → Type ℓ Ł
+--   _$ℓ_ : ∀ {ℓ Ł n} → Type 0 n → Vec (Life 0 n) n → Type ℓ Ł
+
+-- data _≡≡_ {ℓ Ł} : Type ℓ Ł → Type ℓ Ł → Set where
+--   eq-refl : ∀ {τ} → τ ≡≡ τ
+--   eq-sym : ∀ {a b} → a ≡≡ b → b ≡≡ a
+--   eq-~ : ∀ {a b} → a ≡≡ b → ~ a ≡≡ ~ b
+--   eq-& : ∀ {a b l m} → a ≡≡ b → & l m a ≡≡ & l m b
+--   eq-opt : ∀ {a b} → a ≡≡ b → opt a ≡≡ opt b
+--   eq-struct : ∀ {n} {as bs : Vec (Type ℓ Ł) n}
+--             → All (λ ab → fst ab ≡≡ snd ab) (zip as bs)
+--             → struct n as ≡≡ struct n bs
+--   eq-μ : ∀ {T a b} → a ≡≡ b → μ T a ≡≡ μ T b
+--   eq-λℓ : ∀ {n a b} → a ≡≡ b → λℓ n a ≡≡ λℓ n b
+--   eq-$ℓ : ∀ {n} {Łs : Vec (Life 0 n) n} {a b : Type 0 n} → a ≡≡ b → (a $ℓ Łs) ≡≡ (b $ℓ Łs)
+--   eq-$λ : ∀ {n} {τ : Type 0 n} {Łs : Vec (Life 0 n) n}
+--         → (λℓ n τ $ℓ Łs) ≡≡ {!!}
+
+-- test-A : ∀ {ℓ Ł} → Type ℓ Ł
+-- test-A = struct 1 ([ int ])
+-- test-B : ∀ {ℓ Ł} → Type ℓ Ł
+-- test-B = λℓ 1 (struct 2 ([ int ,, & (var fZ) mut int ]))
+-- test-C : ∀ {ℓ Ł} → Type ℓ Ł
+-- test-C = λℓ 1 (struct 2 ([ test-A ,, test-B $ℓ ([ var fZ ]) ]))
+-- test-D : ∀ {ℓ Ł} → Type ℓ Ł
+-- test-D = λℓ 1 (struct 4 ([ test-C $ℓ ([ var fZ ]) ,, test-A
+--                         ,, test-C $ℓ ([ var fZ ]) ,, test-B $ℓ ([ var fZ ]) ]))
+-- test-E : ∀ {ℓ Ł} → Type ℓ Ł
+-- test-E = struct 1 ([ ~ int ])
+-- test-List : ∀ {ℓ Ł} → Type ℓ Ł
+-- test-List = μ (` 0) (struct 2 ([ int ,, opt (~ (var (` 0))) ]))
+
+-- data Path : (x : ℕ) → Set where
+--   var : ∀ {x} → Fin x → Path x
+--   * : ∀ {x} → Path x → Path x
+--   <_>_∙_ : ∀ {x} → (n : ℕ) → Path x → Fin n →  Path x
+
+-- data Expr : (x ℓ Ł : ℕ) → Set where
+--   num : ∀ {x ℓ Ł} → ℕ → Expr x ℓ Ł
+--   add : ∀ {x ℓ Ł} → Path x → Path x → Expr x ℓ Ł
+--   use : ∀ {x ℓ Ł} → Path x → Expr x ℓ Ł
+--   ~ : ∀ {x ℓ Ł} → Path x → Expr x ℓ Ł
+--   & : ∀ {x ℓ Ł} → Life ℓ Ł → Mut → Path x → Expr x ℓ Ł
+--   some : ∀ {x ℓ Ł} → Path x → Expr x ℓ Ł
+--   none : ∀ {x ℓ Ł} → Type ℓ Ł → Expr x ℓ Ł
+--   struct : ∀ {x ℓ Ł n} → Vec (Path x) n → Expr x ℓ Ł
+--   -- dealing with recursive types
+--   fold : ∀ {x ℓ Ł} → Type ℓ Ł → Expr x ℓ Ł → Expr x ℓ Ł
+--   unfold : ∀ {x ℓ Ł} → Type ℓ Ł → Expr x ℓ Ł → Expr x ℓ Ł
+
+-- data Func : (Ł x : ℕ) → Set
+
+-- data Stmt : (x ℓ Ł : ℕ) → Set where
+--   seq : ∀ {x ℓ Ł n} → Vec (Stmt x ℓ Ł) n → Stmt x ℓ Ł
+--   pop : ∀ {x ℓ Ł} → Stmt (S x) ℓ Ł → Stmt x ℓ Ł
+--   -- set
+--   _←_ : ∀ {x ℓ Ł} → Path x → Expr x ℓ Ł → Stmt x ℓ Ł
+--   -- overwrite
+--   _:=_ : ∀ {x ℓ Ł} → Path x → Expr x ℓ Ł → Stmt x ℓ Ł
+--   free : ∀ {x ℓ Ł} → Path x → Stmt x ℓ Ł
+--   drop : ∀ {x ℓ Ł} → Path x → Stmt x ℓ Ł
+--   block : ∀ {x ℓ Ł n} → Vec (Type (S ℓ) Ł) n → Stmt (plus n x) (S ℓ) Ł → Stmt x ℓ Ł
+--   call : ∀ {x ℓ Ł i j} → Func i j → Vec (Life ℓ Ł) i → Vec (Path x) j → Stmt x ℓ Ł
+--   -- TODO match
+
+-- record FVar : Set where
+--   constructor `f
+--   field
+--     key : ℕ
+
+-- `f-inj : ∀ {a b} → `f a ≡ `f b → a ≡ b
+-- `f-inj refl = refl
+
+-- ==FV : (a b : FVar) → Dec (a ≡ b)
+-- ==FV (`f a) (`f b) with a == b
+-- ==FV (`f a) (`f .a) | yes refl = yes refl
+-- ==FV (`f a) (`f b) | no neq = no (neq ∘ `f-inj)
+
+-- EqFVar : Eq FVar
+-- EqFVar = record { _==_ = ==FV }
+
+-- data Func where
+--   var : ∀ {Ł x} → FVar → Func Ł x
+--   def : ∀ {Ł x}
+--       → FVar
+--       → Vec (Type 0 Ł) x
+--       → Stmt x 0 Ł
+--       → Func Ł x
+
+-- test-sum-list : Func 2 2
+-- test-sum-list = def (`f 1)
+--                     ([ & (var (fin 1)) imm test-List
+--                     ,, & (var (fin 0)) mut int ])
+--                     (block ([ int ])
+--                            (seq ([ var (fin 0) ← use (< 2 > * (var (fin 2)) ∙ fin 0)
+--                                 -- TODO match
+--                                 ,, {!!} 
+--                                 ])))
+-- test-sum-main : Func 1 1
+-- test-sum-main = def (`f 0)
+--                     ([ & (var fZ) mut int ])
+--                     (block ([ int
+--                            ,, opt (~ test-List)
+--                            ,, test-List
+--                            ,, ~ test-List
+--                            ])
+--                            (seq ([ var (fin 3) ← num 22
+--                                 ,, var (fin 2) ← none (~ test-List)
+--                                 ,, var (fin 1) ← fold test-List
+--                                                       (struct ([ var (fin 3)
+--                                                               ,, var (fin 2) ]))
+--                                 ,, var (fin 0) ← ~ (var (fin 1))
+--                                 ,, var (fin 3) := num 44
+--                                 ,, var (fin 2) ← some (var (fin 0))
+--                                 ,, var (fin 1) ← fold test-List
+--                                                       (struct ([ var (fin 3)
+--                                                               ,, var (fin 2) ]))
+--                                 ,, var (fin 0) ← ~ (var (fin 1))
+--                                 ,, block ([ & (val (fin 0)) imm test-List ])
+--                                          (seq ([ var fZ ← & (val fZ) imm (* (var (fin 1)))
+--                                               ,, call test-sum-list
+--                                                       ([ val (fin 0)
+--                                                       ,, var (fin 0) ]) 
+--                                                       ([ var fZ
+--                                                       ,, var (fin 5) ])
+--                                               ]))
+--                                 ,, drop (var (fin 0))
+--                                 ])))
+
+-- test-Γ : Vec (Type 1 0) 8
+-- test-Γ = [
+--         {- s/0 -} opt (~ int)
+--         {- r/1 -} ,, ~ int
+--         {- q/2 -} ,, & (val (fin 0)) imm int
+--         {- c/3 -} ,, test-C $ℓ ([ static ])
+--         {- b/4 -} ,, test-B $ℓ ([ static ])
+--         {- a/5 -} ,, test-A
+--         {- p/6 -} ,, ~ int
+--         {- i/7 -} ,, int
+--         ]
+
+
+
+-- data _⊢_∶_ {X ℓ Ł} (Γ : Vec (Type ℓ Ł) X) : Path X → Type ℓ Ł → Set where
+--   type-var : ∀ {x : Fin X} → Γ ⊢ var x ∶ (Γ ! x)
+--   type-*~ : ∀ {p τ} → Γ ⊢ p ∶ ~ τ → Γ ⊢ * p ∶ τ
+--   type-*& : ∀ {p l m τ} → Γ ⊢ p ∶ & l m τ → Γ ⊢ * p ∶ τ
+--   type-∙ : ∀ {n p f τs} τ
+--          → τ ≡ struct n τs
+--          → Γ ⊢ p ∶ τ
+--          → Γ ⊢ < n > p ∙ f ∶ (τs ! f)
+
+-- test-lvtype-1 : test-Γ ⊢ * (var (fin 6)) ∶ int
+-- test-lvtype-1 = type-*~ type-var
+-- test-lvtype-2 : test-Γ ⊢ < 2 > var (fin 3) ∙ fin 1 ∶ (test-B $ℓ ([ static ]))
+-- test-lvtype-2 = type-∙ (test-C $ℓ ([ static ])) {!!} {!!}

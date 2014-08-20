@@ -13,3 +13,6 @@ f $ x = f x
 
 id : {α : Level} {A : Set α} → A → A
 id a = a
+
+the : {α : Level} (A : Set α) → A → A
+the A a = a

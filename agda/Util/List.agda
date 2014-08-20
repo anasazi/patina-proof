@@ -99,10 +99,14 @@ module Util.List where
   _⊆_ : ∀ {a} {A : Set a} (xs ys : List A) → Set a
   xs ⊆ ys = All (λ x → x ∈ ys) xs
 
-  _∪_ : {A : Set} {{EqA : Eq A}} → A → List A → List A
-  x ∪ xs with x ∈? xs
-  x ∪ xs | yes _ = xs
-  x ∪ xs | no  _ = x ∷ xs
+  unq-cons : {A : Set} {{EqA : Eq A}} → A → List A → List A
+  unq-cons x xs with x ∈? xs
+  unq-cons x xs | yes _ = xs
+  unq-cons x xs | no  _ = x ∷ xs
+
+  _∪_ : {A : Set} {{EqA : Eq A}} → List A → List A → List A
+  [] ∪ ys = ys
+  (x ∷ xs) ∪ ys = unq-cons x (xs ∪ ys)
 
   data NoDup {a} {A : Set a} : List A → Set a where
     nd[] : NoDup []

@@ -36,6 +36,21 @@ _!_ : ∀ {A n} → Vec A n → Fin n → A
 (x ∷ xs) ! fZ = x
 (x ∷ xs) ! fS i = xs ! i
 
+set : ∀ {A n} → Vec A n → Fin n → A → Vec A n
+set (x ∷ xs) fZ v = v ∷ xs
+set (x ∷ xs) (fS i) v = x ∷ set xs i v
+
+_⊗_ : ∀ {n A B} → Vec (A → B) n → Vec A n → Vec B n
+[] ⊗ [] = []
+(f ∷ fs) ⊗ (x ∷ xs) = f x ∷ fs ⊗ xs
+
+rep : ∀ {A} → A → (n : ℕ) → Vec A n
+rep x Z = []
+rep x (S n) = x ∷ rep x n
+
+map′ : ∀ {n A B} (f : A → B) → Vec A n → Vec B n
+map′ f xs = rep f _ ⊗ xs
+
 map : ∀ {A B n} (f : A → B) → Vec A n → Vec B n
 map f [] = []
 map f (x ∷ xs) = f x ∷ map f xs
@@ -60,7 +75,69 @@ x ∈? (y ∷ xs) | no _ | yes pf = yes (S pf)
 x ∈? (y ∷ xs) | no ¬eq | no ¬rec = no (λ { (Z h) → ¬eq h
                                          ; (S h) → ¬rec h})
 
-_∪_ : ∀ {A n} {{EqA : Eq A}} → A → Vec A n → Σ ℕ (Vec A)
-x ∪ xs with x ∈? xs
-x ∪ xs | yes pf = _ , xs
-x ∪ xs | no ¬pf = S _ , (x ∷ xs)
+uniqcons : ∀ {A n} {{EqA : Eq A}} → A → Vec A n → Σ ℕ (Vec A)
+uniqcons x xs with x ∈? xs
+uniqcons x xs | yes pf = _ , xs
+uniqcons x xs | no ¬pf = S _ , (x ∷ xs)
+
+_∪_ : ∀ {A n m} {{EqA : Eq A}} → Vec A n → Vec A m → Σ ℕ (Vec A)
+[] ∪ ys = _ , ys
+(x ∷ xs) ∪ ys with xs ∪ ys
+(x ∷ xs) ∪ ys | _ , xys = uniqcons x xys 
+
+_++_ : ∀ {A n m} → Vec A n → Vec A m → Vec A (plus n m)
+[] ++ ys = ys
+(x ∷ xs) ++ ys = x ∷ xs ++ ys
+
+snoc : ∀ {A n} → Vec A n → A → Vec A (S n)
+snoc [] x = [ x ]
+snoc (y ∷ xs) x = y ∷ snoc xs x
+
+rev : ∀ {A n} → Vec A n → Vec A n
+rev [] = []
+rev (x ∷ xs) = snoc (rev xs) x
+
+zip : ∀ {A B n} → Vec A n → Vec B n → Vec (A × B) n
+zip [] [] = []
+zip (x ∷ xs) (y ∷ ys) = x , y ∷ zip xs ys
+
+range : ∀ n → Vec ℕ n
+range Z = []
+range (S n) = snoc (range n) n
+
+range′ : ∀ n → Vec (Fin n) n
+range′ Z = []
+range′ (S n) = fZ ∷ map fS (range′ n)
+
+range′-test : range′ 3 ≡ ([ fin 0 ,, fin 1 ,, fin 2 ])
+range′-test = refl
+
+range′′ : ∀ n m → Vec (Fin (plus n m)) n
+range′′ n m = map (expand m) (range′ n)
+
+{-
+take : ∀ {A m} n → Vec A (plus n m) → Vec A n
+take Z xs = []
+take (S n) (x ∷ xs) = x ∷ (take n xs)
+
+drop : ∀ {A m} n → Vec A (plus n m) → Vec A m
+drop Z xs = xs
+drop (S n) (x ∷ xs) = drop n xs
+
+remove : ∀ {A n} → Vec A (S n) → Fin (S n) → Vec A n
+remove (x ∷ xs) fZ = xs
+remove (x ∷ xs) (fS i) = {!!}
+-}
+
+data remove-elem {A} : ∀ {n} → Vec A (S n) → Fin (S n) → Vec A n → Set where
+  re-Z : ∀ {n x xs} → remove-elem {_} {n} (x ∷ xs) fZ xs
+  re-S : ∀ {n x xs i xs′}
+       → remove-elem {_} {n} xs i xs′
+       → remove-elem (x ∷ xs) (fS i) (x ∷ xs′) 
+
+test-remove-elem-1 : remove-elem ([ 0 ,, 1 ,, 2 ]) (fin 0) ([ 1 ,, 2 ])
+test-remove-elem-1 = re-Z
+test-remove-elem-2 : remove-elem ([ 0 ,, 1 ,, 2 ]) (fin 1) ([ 0 ,, 2 ])
+test-remove-elem-2 = re-S re-Z
+test-remove-elem-3 : remove-elem ([ 0 ,, 1 ,, 2 ]) (fin 2) ([ 0 ,, 1 ])
+test-remove-elem-3 = re-S (re-S re-Z)
