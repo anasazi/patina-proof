@@ -227,9 +227,9 @@ test-stok-7 = call (fn skip (int ∷ int ∷ []))
                    (int ∷ int ∷ [])
 test-stok-8 : stok [] 1 3
               ([ & (val (fin 1)) imm (& (val (fin 2)) imm int) ])
-              ([ & (bank-def _) (& (val (fin 2)) imm int) ])
+              ([ & (init (bank-def _) (& (val (fin 2)) imm int)) ])
               (unregion skip)
-              ([ & (bank-def _) (& (val (fin 2)) imm int) ])
+              ([ & (init (bank-def _) (& (val (fin 2)) imm int)) ])
 test-stok-8 = unregion skip
 
 test-fnok-1 : fnok [] (fn ([ ~ int ,, ~ int ]) (free (var fZ) seq free (var (fin 1))))

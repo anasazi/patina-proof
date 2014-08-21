@@ -85,7 +85,7 @@ test-lvaddr-1 = var
 data _⊢_∶_shape {#x #ℓ} (Δ : Vec (Shape #ℓ) #x) : Path #x → Shape #ℓ → Set where
   var : ∀ {x} → Δ ⊢ var x ∶ Δ ! x shape
   *~ : ∀ {p B δ} → Δ ⊢ p ∶ ~ (init B δ) shape → Δ ⊢ * p ∶ δ shape
-  *& : ∀ {p B τ} → Δ ⊢ p ∶ & B τ shape → Δ ⊢ * p ∶ init-t τ shape
+  *& : ∀ {p B τ} → Δ ⊢ p ∶ & (init B τ) shape → Δ ⊢ * p ∶ init-t τ shape
 
 _⊢_deep : ∀ {#x #ℓ} → Vec (Shape #ℓ) #x → Path #x → Set
 Δ ⊢ p deep = Σ[ δ ∈ Shape _ ] Δ ⊢ p ∶ δ shape × δ Full
