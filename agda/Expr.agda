@@ -8,6 +8,7 @@ open import Loan
 
 module Expr where
 
+-- Exprs are indexed by the number of variables and the lifetime relation
 data Expr : (#x #ℓ : ℕ) → Set where
   int : ∀ {#x #ℓ} → ℕ → Expr #x #ℓ
   add : ∀ {#x #ℓ} → Path #x → Path #x → Expr #x #ℓ
@@ -16,6 +17,7 @@ data Expr : (#x #ℓ : ℕ) → Set where
   some : ∀ {#x #ℓ} → Path #x → Expr #x #ℓ
   none : ∀ {#x #ℓ} → Type #ℓ → Expr #x #ℓ
 
+-- upshifting for the indicies of Expr
 ↑-var-e : ∀ {#x #ℓ} → (amt : ℕ) → (cut : Fin #x) → Expr #x #ℓ → Expr (plus amt #x) #ℓ
 ↑-var-e d c (int n) = int n
 ↑-var-e d c (add p₁ p₂) = add (↑-var-p d c p₁) (↑-var-p d c p₂)
@@ -50,6 +52,7 @@ data Expr : (#x #ℓ : ℕ) → Set where
 ↑-#Ł-e d c (none τ) = none (↑-#Ł-t′ d 0 τ)
 -}
 
+-- Typing for Expressions
 data _,_⊢_∶_,_expr {#x #ℓ} : Vec (Type #ℓ) #x → Vec (Shape #ℓ) #x → Expr #x #ℓ
                          → Type #ℓ → Vec (Shape #ℓ) #x → Set where
   int : ∀ {Γ Δ n} → Γ , Δ ⊢ int n ∶ int , Δ expr
@@ -102,6 +105,8 @@ test-rvok-5 : ([ int {0} ])
             , [ int (init (bank-def _) tt) ] expr
 test-rvok-5 = new (copy var int (can-access (int (init (bank [] free) tt) , (var , int))))
 
+-- Evalutation for Exprs
+-- Assigns the result to a provided Route
 data _∣_,_,_⊢_←_⟶_∣_ {#x #ℓ} : (#aᵢ : ℕ)
                        → Vec (Type #ℓ) #x
                        → Vec (Fin #aᵢ) #x
