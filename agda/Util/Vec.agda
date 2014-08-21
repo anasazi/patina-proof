@@ -141,3 +141,10 @@ test-remove-elem-2 : remove-elem ([ 0 ,, 1 ,, 2 ]) (fin 1) ([ 0 ,, 2 ])
 test-remove-elem-2 = re-S re-Z
 test-remove-elem-3 : remove-elem ([ 0 ,, 1 ,, 2 ]) (fin 2) ([ 0 ,, 1 ])
 test-remove-elem-3 = re-S (re-S re-Z)
+
+data ↓xs {n} : ∀ {m} → ℕ → Vec (Fin (S n)) m → Vec (Fin n) m → Set where
+  [] : ∀ {c} → ↓xs c [] []
+  _∷_ : ∀ {m c i is j} {js : Vec (Fin n) m}
+      → ↓c c i j
+      → ↓xs c is js
+      → ↓xs c (i ∷ is) (j ∷ js)

@@ -30,8 +30,6 @@ data Shape (#ℓ : ℕ) : Set where
 
 ↑-#ℓ-sh d c (int h) = int (↑-#ℓ-h⊤ d c h)
 ↑-#ℓ-sh d c (~ h) = ~ (↑-#ℓ-hsh d c h)
--- ↑-#ℓ-sh d c (~ void) = ~ void
--- ↑-#ℓ-sh d c (~ (init δ)) = ~ (init (↑-#ℓ-sh d c δ))
 ↑-#ℓ-sh d c (& B τ) = & (↑-#ℓ-b d c B) (↑-#ℓ-t d c τ)
 ↑-#ℓ-sh d c (opt h) = opt (↑-#ℓ-h⊤ d c h)
 
@@ -43,13 +41,9 @@ data ↓1-#ℓ-hsh {#ℓ} : ℕ → Hole (Shape (S #ℓ)) (S #ℓ) → Hole (Sha
 
 data ↓1-#ℓ-sh {#ℓ} where
   int : ∀ {c h h′} → ↓1-#ℓ-h⊤ c h h′ → ↓1-#ℓ-sh c (int h) (int h′)
---   int : ∀ {c f} → ↓1-#ℓ-sh c (int f) (int f) 
   ~ : ∀ {c h h′} → ↓1-#ℓ-hsh c h h′ → ↓1-#ℓ-sh c (~ h) (~ h′)
---   ~ : ∀ {c δ δ′} → ↓1-#ℓ-sh c δ δ′ → ↓1-#ℓ-sh c (~ (init δ)) (~ (init δ′))
---   ~⊥ : ∀ {c} → ↓1-#ℓ-sh c (~ void) (~ void)
   & : ∀ {c B B′ τ τ′} → ↓1-#ℓ-b c B B′ → ↓1-#ℓ-t c τ τ′ → ↓1-#ℓ-sh c (& B τ) (& B′ τ′)
   opt : ∀ {c h h′} → ↓1-#ℓ-h⊤ c h h′ → ↓1-#ℓ-sh c (opt h) (opt h′)
---   opt : ∀ {c f} → ↓1-#ℓ-sh c (opt f) (opt f) 
 
 data ↓1-#ℓ-shs {#ℓ} : ∀ {n} → ℕ → Vec (Shape (S #ℓ)) n → Vec (Shape #ℓ) n → Set where
   [] : ∀ {c} → ↓1-#ℓ-shs c [] []

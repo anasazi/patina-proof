@@ -23,6 +23,24 @@ data Layout (#a : ℕ) : Set where
 ↑-alloc-ls d c [] = []
 ↑-alloc-ls d c (l ∷ ls) = ↑-alloc-l d c l ∷ ↑-alloc-ls d c ls
 
+data ↓-#a-vr {#a} : ℕ → Value (Route (S #a)) → Value (Route #a) → Set where
+  void : ∀ {c} → ↓-#a-vr c void void
+  val : ∀ {c r r′} → ↓-#a-r c r r′ → ↓-#a-vr c (val r) (val r′)
+
+data ↓-#a-ls {#a} : ∀ {n} → ℕ → Vec (Layout (S #a)) n → Vec (Layout #a) n → Set
+
+data ↓-#a-l {#a} : ℕ → Layout (S #a) → Layout #a → Set where
+  int : ∀ {c n} → ↓-#a-l c (int n) (int n)
+  ptr : ∀ {c r r′} → ↓-#a-vr c r r′ → ↓-#a-l c (ptr r) (ptr r′)
+  rec : ∀ {n c ls} {ls′ : Vec (Layout #a) n} → ↓-#a-ls c ls ls′ → ↓-#a-l c (rec ls) (rec ls′)
+
+data ↓-#a-ls {#a} where
+  [] : ∀ {c} → ↓-#a-ls c [] []
+  _∷_ : ∀ {n c l ls l′} {ls′ : Vec (Layout #a) n}
+      → ↓-#a-l c l l′
+      → ↓-#a-ls c ls ls′
+      → ↓-#a-ls c (l ∷ ls) (l′ ∷ ls′)
+
 data layoutof {#a #ℓ} :  Type #ℓ → Layout #a → Set where
   int : layoutof int (int void) 
   ~ : ∀ {τ} → layoutof (~ τ) (ptr void)

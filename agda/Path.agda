@@ -11,6 +11,7 @@ data Path (#x : ℕ) : Set where
   var : Fin #x → Path #x
   * : Path #x → Path #x
 
+  {-
 var-inj : ∀ {#x} {x₁ x₂ : Fin #x} → var x₁ ≡ var x₂ → x₁ ≡ x₂ 
 var-inj refl = refl
 path-*-inj : ∀ {#x} {p₁ p₂ : Path #x} → (the (Path #x) (* p₁)) ≡ * p₂ → p₁ ≡ p₂
@@ -28,6 +29,7 @@ var x₁ =path= * p₂ = no (λ ())
 
 EqPath : ∀ {#x} → Eq (Path #x)
 EqPath = record { _==_ = _=path=_ }
+-}
 
 ↑-var-p : ∀ {#x} → (amt : ℕ) → (cut : Fin #x) → Path #x → Path (plus amt #x)
 ↑-var-p d c (var x) with asℕ x <? asℕ c
@@ -205,22 +207,6 @@ data _∣_,_⊢_dropped {#ℓ} : ∀ #x → Vec (Type #ℓ) #x → Vec (Shape #�
   dropped-copy : ∀ {#x Γ Δ p τ} → Γ ⊢ p ∶ τ → τ ¬Drop → #x ∣ Γ , Δ ⊢ p dropped
 
 {-
-data _,_,_⊢_⟶_ {#x #v} : Vec Type #x
-                            → Vec (Fin #v) #x
-                            → Vec (Value #v) #v
-                            → Path #x
-                            → Fin #v
-                            → Set where
-  var : ∀ {T V H x} → T , V , H ⊢ var x ⟶ (V ! x)
-
-test-lvaddr-1 : ([ int ,, int ])
-              , [ fin 2 ,, fin 1 ]
-              , [ ptr (fin 1) ,, int 0 ,, int 1 ,, void ]
-              ⊢ var (fin 1) ⟶ fin 1
-test-lvaddr-1 = var
--}
-
-{-
 data _prefixof_ {#x} : Path #x → Path #x → Set where
   --var : ∀ {x₁ x₂} → x₁ ≡ x₂ → var x₁ prefixof var x₂
   var : ∀ {x} → var x prefixof var x
@@ -286,13 +272,6 @@ data _,_⊢_∶_,_use {#x} : Vec Type #x
        → Γ , Δ ⊢ p read
        → Γ , Δ ⊢ p ∶ τ , Δ use
   -- TODO move
--}
-
-{-
-expire-Δ : ∀ {#x} → L.List (Path (S #x)) → L.List (Path #x)
-expire-Δ L.[] = L.[]
-expire-Δ (var fZ L.∷ Δ) = expire-Δ Δ
-expire-Δ (var (fS x) L.∷ Δ) = var x L.∷ expire-Δ Δ
 -}
 
 {-

@@ -21,3 +21,8 @@ data _⊢_∶_route {#a #ℓ} (σ : Vec (Type #ℓ) #a) : Route #a → Type #ℓ
 ↑-alloc-r d c (alloc α) | no  α≥c = alloc (raise d α)
 ↑-alloc-r d c (* r) = * (↑-alloc-r d c r)
 ↑-alloc-r d c (< n > ρ ∙ f) = < n > ↑-alloc-r d c ρ ∙ f
+
+data ↓-#a-r {#a} : ℕ → Route (S #a) → Route #a → Set where
+  alloc : ∀ {c a a′} → ↓c c a a′ → ↓-#a-r c (alloc a) (alloc a′)
+  * : ∀ {c r r′} → ↓-#a-r c r r′ → ↓-#a-r c (* r) (* r′)
+  ∙ : ∀ {c n r r′ f} → ↓-#a-r c r r′ → ↓-#a-r c (< n > r ∙ f) (< n > r′ ∙ f)

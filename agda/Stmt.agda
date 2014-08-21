@@ -24,10 +24,10 @@ open Func
 data Stmt where
   skip : ∀ {#f #x #ℓ} → Stmt #f #x #ℓ
   _seq_ : ∀ {#f #x #ℓ} → Stmt #f #x #ℓ → Stmt #f #x #ℓ → Stmt #f #x #ℓ
-  _pop_ : ∀ {#f #x #ℓ} → Stmt #f (S #x) #ℓ → Stmt #f #x #ℓ → Stmt #f (S #x) #ℓ
-  _endregion_ : ∀ {#f #x #ℓ} → Stmt #f #x (S #ℓ) → Stmt #f #x #ℓ → Stmt #f #x (S #ℓ)
   push : ∀ {#f #x #ℓ} → Type #ℓ → Stmt #f (S #x) #ℓ → Stmt #f #x #ℓ
+  pop : ∀ {#f #x #ℓ} → Stmt #f (S #x) #ℓ → Stmt #f (S #x) #ℓ
   region : ∀ {#f #x #ℓ} → Stmt #f #x (S #ℓ) → Stmt #f #x #ℓ
+  unregion : ∀ {#f #x #ℓ} → Stmt #f #x (S #ℓ) → Stmt #f #x (S #ℓ)
   _⇐_ : ∀ {#f #x #ℓ} → Path #x → Expr #x #ℓ → Stmt #f #x #ℓ
   free : ∀ {#f #x #ℓ} → Path #x → Stmt #f #x #ℓ
   call : ∀ {#f #x #ℓ n} → Fin #f → Vec (Path #x) n → Stmt #f #x #ℓ
@@ -36,10 +36,10 @@ data Stmt where
 ↑-var-s : ∀ {#f #x #ℓ} → (d : ℕ) → ℕ → Stmt #f #x #ℓ → Stmt #f (plus #x d) #ℓ
 ↑-var-s d c skip = skip
 ↑-var-s d c (s₁ seq s₂) = ↑-var-s d c s₁ seq ↑-var-s d c s₂
-↑-var-s d c (s₁ pop s₂) = ↑-var-s d c s₁ pop ↑-var-s d c s₂
-↑-var-s d c (s₁ endregion s₂) = ↑-var-s d c s₁ endregion ↑-var-s d c s₂
 ↑-var-s d c (push τ s) = push τ (↑-var-s d (S c) s)
+↑-var-s d c (pop s) = pop (↑-var-s d c s)
 ↑-var-s d c (region s) = region (↑-var-s d c s)
+↑-var-s d c (unregion s) = unregion (↑-var-s d c s)
 ↑-var-s d c (p ⇐ e) = ↑-var-p′′ d c p ⇐ ↑-var-e′ d c e
 ↑-var-s d c (free p) = free (↑-var-p′′ d c p)
 ↑-var-s d c (call f ps) = call f (map (↑-var-p′′ d c) ps)
@@ -53,10 +53,10 @@ data Stmt where
 ↑-#ℓ-s : ∀ {#f #x #ℓ} → (d : ℕ) → ℕ → Stmt #f #x #ℓ → Stmt #f #x (plus #ℓ d)
 ↑-#ℓ-s d c skip = skip
 ↑-#ℓ-s d c (s₁ seq s₂) = ↑-#ℓ-s d c s₁ seq ↑-#ℓ-s d c s₂
-↑-#ℓ-s d c (s₁ pop s₂) = ↑-#ℓ-s d c s₁ pop ↑-#ℓ-s d c s₂
-↑-#ℓ-s d c (s₁ endregion s₂) = ↑-#ℓ-s d c s₁ endregion ↑-#ℓ-s d c s₂
 ↑-#ℓ-s d c (push τ s) = push (↑-#ℓ-t′ d c τ) (↑-#ℓ-s d c s)
+↑-#ℓ-s d c (pop s) = pop (↑-#ℓ-s d c s)
 ↑-#ℓ-s d c (region s) = region (↑-#ℓ-s d (S c) s)
+↑-#ℓ-s d c (unregion s) = unregion (↑-#ℓ-s d c s)
 ↑-#ℓ-s d c (p ⇐ e) = p ⇐ ↑-#ℓ-e d c e
 ↑-#ℓ-s d c (free p) = free p
 ↑-#ℓ-s d c (call f ps) = call f ps
@@ -135,24 +135,20 @@ data stok {#f} (F : Vec (Func #f) #f) where
         → stok F #x #ℓ Γ Δ₀ s₁ Δ₁
         → stok F #x #ℓ Γ Δ₁ s₂ Δ₂
         → stok F #x #ℓ Γ Δ₀ (s₁ seq s₂) Δ₂ 
-  _pop_ : ∀ {#x #ℓ τ Γ δ Δ₀ δ′ Δ₁ Δ₂ s₁ s₂}
-        → stok F (S #x) #ℓ (τ ∷ Γ) (δ ∷ Δ₀) s₁ (δ′ ∷ Δ₁)
-        → stok F #x #ℓ Γ Δ₁ s₂ Δ₂
-        → stok F (S #x) #ℓ (τ ∷ Γ) (δ ∷ Δ₀) (s₁ pop s₂) (δ′ ∷ Δ₂)
-  _∣_,_endregion_ : ∀ {#x #ℓ Γ ↓Γ Δ₀ Δ₁ ↓Δ₁ Δ₂ s₁ s₂}
-                  → stok F #x (S #ℓ) Γ Δ₀ s₁ Δ₁
-                  → ↓1-#ℓ-ts 0 Γ ↓Γ
-                  → ↓1-#ℓ-shs 0 Δ₁ ↓Δ₁
-                  → stok F #x #ℓ ↓Γ ↓Δ₁ s₂ Δ₂
-                  → stok F #x (S #ℓ) Γ Δ₀ (s₁ endregion s₂) (map (↑-#ℓ-sh 1 0) Δ₂)
   push : ∀ {#x #ℓ Γ Δ τ s δ′ Δ′}
        → stok F (S #x) #ℓ (τ ∷ Γ) (void-t τ ∷ Δ) s (δ′ ∷ Δ′)
        → S #x ∣ τ ∷ Γ , δ′ ∷ Δ′ ⊢ var fZ dropped
        → stok F #x #ℓ Γ Δ (push τ s) Δ′
+  pop : ∀ {#x #ℓ Γ Δ s Δ′}
+         → stok F (S #x) #ℓ Γ Δ s Δ′
+         → stok F (S #x) #ℓ Γ Δ (pop s) Δ′
   region : ∀ {#x #ℓ Γ Δ s Δ′ ↓Δ′}
          → stok F #x (S #ℓ) (map (↑-#ℓ-t 1 0) Γ) (map (↑-#ℓ-sh 1 0) Δ) s Δ′
          → ↓1-#ℓ-shs 0 Δ′ ↓Δ′
          → stok F #x #ℓ Γ Δ (region s) ↓Δ′
+  unregion : ∀ {#x #ℓ Γ Δ₀ s Δ₁}
+           → stok F #x (S #ℓ) Γ Δ₀ s Δ₁
+           → stok F #x (S #ℓ) Γ Δ₀ (unregion s) Δ₁
   ⇐ok : ∀ {#x #ℓ Γ Δ₀ p e τᵣ τₗ Δ₁ Δ₂}
       → Γ , Δ₀ ⊢ e ∶ τᵣ , Δ₁ expr
       → Δ₁ ⊢ p can-init
@@ -176,15 +172,12 @@ data stok {#f} (F : Vec (Func #f) #f) where
              -- path safe to use
              → Γ , Δ₀ ⊢ p ∶ opt τ , Δ₁ use
              -- arms of match are ok
-             --→ stok F (S #x) {!!} {!!} (τ ∷ Γ) (init-from-type τ ∷ Δ₁) sₛ (δ ∷ Δ₂)
              → (δ : Shape #ℓ)
              → τ ⊢ δ Dropped
              → stok F (S #x) (S #ℓ)
                     (map (↑-#ℓ-t 1 0) (τ ∷ Γ))
                     (map (↑-#ℓ-sh 1 0) ((init-t τ) ∷ Δ₁))
                     sₛ
-                    --(↑-#ℓ-sh 1 0 δ ∷ map (↑-#ℓ-sh 1 0) Δ₂)
-                    --(map (↑-#ℓ-sh 1 0) (δ ∷ Δ₂))
                     (map (↑-#ℓ-sh 1 0) (δ ∷ Δ₂))
                     --(map (↑-#ℓ-sh 1 0) (dropped-t τ ∷ Δ₂))
              → stok F #x #ℓ Γ Δ₁ sₙ Δ₂
@@ -213,43 +206,14 @@ test-stok-3 = matchbyval (copy var (opt int) (can-access (_ , (var , opt))))
                                    (copy var int (can-access (_ , (var , int)))))
                               (int void , (var , int)) var int (int , (var , var)))
                          (⇐ok int (int void , (var , int)) var int (int , (var , var)))
-              {-
-test-stok-3 = matchbyval (copy var (opt int)
-                               (can-access ((opt (init (bank [] free) tt)) , (var , opt))))
-                         (int (init (bank [] free) tt))
-                         int
-                         (⇐ok (add (copy var int
-                                         (can-access ((int (init (bank (free ∷ []) free) tt))
-                                                     , (var , int))))
-                                   (copy var int
-                                         (can-access ((int (init (bank (free ∷ []) free) tt))
-                                                     , (var , int)))))
-                              ((int void) , (var , int)) var int (int , (var , var)))
-                         (⇐ok int ((int void) , (var , int)) var int (int , (var , var)))
-                         -}
-              {-
-test-stok-3 = matchbyval (copy var (opt int) (can-access (opt (init {!!} tt) , (var , opt))))
-                         (⇐ok (add (copy var int (can-access (int (init {!!} tt) , (var , int))))
-                                   (copy var int (can-access (int (init {!!} tt) , (var , int)))))
-                              ((int void) , (var , int)) var int (int , (var , var)))
-                         (⇐ok int (int void , (var , int)) var int (int , (var , var)))
-                         -}
-              {-
-test-stok-3 = matchbyval (copy var (opt int) (can-access (opt (init tt) , (var , opt))))
-                         (⇐ok (add (copy var int (can-access (int (init tt) , (var , int))))
-                                   (copy var int (can-access (int (init tt) , (var , int)))))
-                              (int void , (var , int)) var int (int , (var , var)))
-                         (⇐ok int (int void , (var , int)) var int (int , (var , var)))
-                         (dropped-copy var int)
-                         -}
 test-stok-4 : stok [] 1 0 ([ ~ int ]) ([ ~ (init (bank-def _) (int (init (bank-def _) tt))) ])
               (free (var fZ)) ([ ~ void ])
 test-stok-4 = free var (dropped-copy (*~ var) int) (~ int , (var , var))
 test-stok-5 : ¬ (stok [] 1 0 ([ ~ (~ int) ]) ([ ~ (init (bank-def _) (~ (init (bank-def _) (int (init (bank-def _) tt))))) ])
-                (skip pop skip) ([ ~ void ]))
-test-stok-5 (() pop skip)
-test-stok-6 : stok [] 1 0 ([ ~ (~ int) ]) ([ ~ void ]) (skip pop skip) ([ ~ void ])
-test-stok-6 = skip pop skip
+                (pop skip) ([ ~ void ]))
+test-stok-5 (pop ())
+test-stok-6 : stok [] 1 0 ([ ~ (~ int) ]) ([ ~ void ]) (pop skip) ([ ~ void ])
+test-stok-6 = pop skip
 test-stok-7 : stok ([ fn ([ int ,, int ]) skip ])
                    2 0 
                    ([ int ,, int ])
@@ -261,32 +225,19 @@ test-stok-7 = call (fn skip (int ∷ int ∷ []))
                   ∷ copy var int (can-access ((int (init (bank [] free) tt)) , (var , int)))
                   ∷ [])
                    (int ∷ int ∷ [])
-{-
-test-stok-7 = call (fn skip)
-                   ( copy var int (can-access (int (init {!!} tt) , (var , int)))
-                   ∷ copy var int (can-access (int (init {!!} tt) , (var , int)))
-                   ∷ [])
-                   (int ∷ int ∷ [])
-                   -}
 test-stok-8 : stok [] 1 3
               ([ & (val (fin 1)) imm (& (val (fin 2)) imm int) ])
               ([ & (bank-def _) (& (val (fin 2)) imm int) ])
-              (skip endregion skip)
+              (unregion skip)
               ([ & (bank-def _) (& (val (fin 2)) imm int) ])
-test-stok-8 = skip
-            ∣ & (S≥ z<s) (& (S≥ z<s) int) ∷ []
-            , & (refl , Z) (& (S≥ z<s) int) ∷ []
-            endregion skip
+test-stok-8 = unregion skip
 
 test-fnok-1 : fnok [] (fn ([ ~ int ,, ~ int ]) (free (var fZ) seq free (var (fin 1))))
 test-fnok-1 = fn ((free var (dropped-copy (*~ var) int) ((~ int) , (var , var))) seq
                   (free var (dropped-copy (*~ var) int) ((~ int) , (var , var))))
                  (~ ∷ ~ ∷ [])
---test-fnok-1 = fn (free var (dropped-copy (*~ var) int) ((~ int) , (var , var)) seq
-                  --free var (dropped-copy (*~ var) int) (~ int , (var , var)))
 test-fnok-2 : ¬ (fnok [] (fn ([ ~ int ]) skip))
 test-fnok-2 (fn skip (() ∷ []))
---test-fnok-2 (fn ())
 -- test-fnok-1 : fnok [] (fn ([ ~ int ,, ~ int ]) (free (var fZ) seq free (var (fin 1))))
 -- test-fnok-1 = fn (free var (dropped-copy (*~ var) int) ((~ int) , (var , var))
 --                    seq free var (dropped-copy (*~ var) int) ((~ int) , (var , var)))
@@ -303,33 +254,28 @@ data stev {#f} (F : Vec (Func #f) #f) : (#x₁ #a₁ #ℓ₁ : ℕ) → Vec (Typ
   stepseq : ∀ {#x #ℓ #a₁ T V₁ H₁ s₁ #a₂ V₂ H₂ s₁′ s₂}
           → stev F #x #a₁ #ℓ T V₁ H₁ s₁ #x #a₂ #ℓ T V₂ H₂ s₁′
           → stev F #x #a₁ #ℓ T V₁ H₁ (s₁ seq s₂) #x #a₂ #ℓ T V₂ H₂ (s₁′ seq s₂)
-  skippop : ∀ {#x #a #ℓ τ T α V l H s}
-          → stev F (S #x) (S #a) #ℓ (τ ∷ T)
-                 (α ∷ map (raise 1) V)
-                 (l ∷ map (↑-alloc-l 1 0) H)
-                 (skip pop s) #x #a #ℓ T V H s
-  steppop : ∀ {#x #ℓ #a₁ T V₁ H₁ s₁ #a₂ V₂ H₂ s₁′ s₂}
-          → stev F (S #x) #a₁ #ℓ T V₁ H₁ s₁ (S #x) #a₂ #ℓ T V₂ H₂ s₁′
-          → stev F (S #x) #a₁ #ℓ T V₁ H₁ (s₁ pop s₂) (S #x) #a₂ #ℓ T V₂ H₂ (s₁′ pop s₂)
-  skipendregion : ∀ {#x #a #ℓ T V H s ↓T}
-                → ↓1-#ℓ-ts 0 T ↓T
-                → stev F #x #a (S #ℓ) T V H (skip endregion s)
-                         #x #a #ℓ ↓T V H s
-  stependregion : ∀ {#x #ℓ #a₁ T V₁ H₁ s₁ #a₂ V₂ H₂ s₁′ s₂}
-          → stev F #x #a₁ (S #ℓ) T V₁ H₁ s₁
-                   #x #a₂ (S #ℓ) T V₂ H₂ s₁′
-          → stev F #x #a₁ (S #ℓ) T V₁ H₁ (s₁ endregion s₂)
-                   #x #a₂ (S #ℓ) T V₂ H₂ (s₁′ endregion s₂)
   push : ∀ {#x #a #ℓ T V H τ s l}
        → layoutof τ l
        → stev F #x #a #ℓ T V H (push τ s)
          (S #x) (S #a) #ℓ (τ ∷ T)
          (fZ ∷ map (raise 1) V)
          (l ∷ (map (↑-alloc-l 1 0) H))
-         (s pop skip) 
+         (pop s)
+  pop-skip : ∀ {#x #a #ℓ τ T α V ↓V l H ↓H}
+              → ↓xs 0 V ↓V
+              → ↓-#a-ls 0 H ↓H
+              → stev F (S #x) (S #a) #ℓ (τ ∷ T) (α ∷ V) (l ∷ H) (pop skip) #x #a #ℓ T ↓V ↓H skip
+  pop-step : ∀ {#x #a #ℓ T V H s #a′ V′ H′ s′}
+              → stev F (S #x) #a #ℓ T V H s (S #x) #a′ #ℓ T V′ H′ s′
+              → stev F (S #x) #a #ℓ T V H (pop s) (S #x) #a′ #ℓ T V′ H′ (pop s′)
   region : ∀ {#x #a #ℓ T V H s}
-         → stev F #x #a #ℓ T V H (region s)
-                  #x #a (S #ℓ) (map (↑-#ℓ-t 1 0) T) V H (s endregion skip)
+         → stev F #x #a #ℓ T V H (region s) #x #a (S #ℓ) (map (↑-#ℓ-t 1 0) T) V H (unregion s)
+  unregion-skip : ∀ {#x #a #ℓ T V H ↓T}
+                → ↓1-#ℓ-ts 0 T ↓T
+                → stev F #x #a (S #ℓ) T V H (unregion skip) #x #a #ℓ ↓T V H skip
+  unregion-step : ∀ {#x #a #ℓ T V H s #a′ V′ H′ s′}
+                → stev F #x #a (S #ℓ) T V H s #x #a′ (S #ℓ) T V′ H′ s′
+                → stev F #x #a (S #ℓ) T V H (unregion s) #x #a′ (S #ℓ) T V′ H′ (unregion s′)
   ⇐ev : ∀ {#x #a #ℓ T V Hᵢ Hₒ p e α}
       → T , V , Hᵢ ⊢ p ⟶ α
       → #a ∣ T , V , Hᵢ ⊢ α ← e ⟶ #a ∣ Hₒ
@@ -347,11 +293,6 @@ data stev {#f} (F : Vec (Func #f) #f) : (#x₁ #a₁ #ℓ₁ : ℕ) → Vec (Typ
   call : ∀ {#x #a #ℓ T V H f} {ps : Vec (Path #x) (#args (F ! f))}
        → stev F #x #a #ℓ T V H (call f ps)
                 #x #a #ℓ T V H (conv #ℓ (args (F ! f)) ps (body (F ! f)))
---   call : ∀ {#x #a T V H f} {-s-} {ps : Vec (Path #x) (#args (F ! f))}
---        --→ s ≡ conv (args (F ! f)) ps (body (F ! f))
---        → stev F #x #a {!!} {!!} T V H (call f ps) #x #a {!!} {!!} T V H
---               (conv (args (F ! f)) ps (body (F ! f)))
---               -- (expand-func (args (F ! f)) ps (body (F ! f)))
   matchnonebyval : ∀ {#x #a #ℓ T V H p sₛ sₙ α l}
                  → T , V , H ⊢ p ⟶ α
                  -- none occupies p
@@ -366,20 +307,20 @@ data stev {#f} (F : Vec (Func #f) #f) : (#x₁ #a₁ #ℓ₁ : ℕ) → Vec (Typ
                           (map (↑-#ℓ-t 1 0) (τ ∷ T))
                           (fZ ∷ map (raise 1) V)
                           (map (↑-alloc-l 1 0) (l ∷ H))
-                          (sₛ pop (skip endregion skip)) 
+                          (unregion (pop sₛ))
 
 test-stev-1 : stev [] 0 0 0 [] [] [] (push int skip)
-                   1 1 0 ([ int ]) ([ fZ ]) ([ int void ]) (skip pop skip)
+                   1 1 0 ([ int ]) ([ fZ ]) ([ int void ]) (pop skip)
 test-stev-1 = push int
-test-stev-2 : stev [] 1 1 0 ([ int ]) ([ fZ ]) ([ int void ]) (skip pop skip)
+test-stev-2 : stev [] 1 1 0 ([ int ]) ([ fZ ]) ([ int void ]) (pop skip)
                    0 0 0 [] [] [] skip 
-test-stev-2 = skippop
+test-stev-2 = pop-skip [] []
 test-stev-3 : stev [] 1 1 0 ([ int ]) ([ fZ ]) ([ int void ]) (var fZ ⇐ int 1)
                    1 1 0 ([ int ]) ([ fZ ]) ([ int (val 1) ]) skip
 test-stev-3 = ⇐ev var (int alloc)
-test-stev-4 : stev [] 1 1 0 ([ int ]) ([ fZ ]) ([ int (val 1) ]) (skip pop skip)
+test-stev-4 : stev [] 1 1 0 ([ int ]) ([ fZ ]) ([ int (val 1) ]) (pop skip)
                    0 0 0 [] [] [] skip 
-test-stev-4 = skippop
+test-stev-4 = pop-skip [] []
 test-stev-5 : stev [] 3 3 0
               ([ opt int ,, int ,, int ])
               ([ fin 0 ,, fin 1 ,, fin 2 ])
@@ -404,7 +345,7 @@ test-stev-6 : stev [] 3 3 0
               ([ int ,, opt int ,, int ,, int ])
               ([ fin 0 ,, fin 1 ,, fin 2 ,, fin 3 ])
               ([ int (val 1) ,, rec ([ int (val 1) ,, int (val 1) ]) ,, int (val 1) ,, int void ])
-              ((var (fin 3) ⇐ add (var (fin 0)) (var (fin 2))) pop (skip endregion skip))
+              (unregion (pop (var (fin 3) ⇐ add (var (fin 0)) (var (fin 2)))))
 test-stev-6 = matchsomebyval var var alloc
 test-stev-7 : stev [] 2 2 0
                    ([ ~ int ,, int ])

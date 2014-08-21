@@ -103,21 +103,25 @@ private
 ↑-fin d c f | no  f≥c = raise d f
 
 data ↓ : ∀ {n} → Fin (S n) → Fin n → Set where
-  Z : ∀ {n} → ↓ {S n} fZ fZ 
   S : ∀ {n i} → ↓ {S n} (fS i) i 
 
+test-↓-1 : ↓ {10} (fin 3) (fin 2)
+test-↓-1 = S
+test-↓-2 : ∀ {n} → ¬ (Σ[ i ∈ Fin n ] ↓ {n} fZ i)
+test-↓-2 (i , ())
+
 data ↓c : ∀ {n} → ℕ → Fin (S n) → Fin n → Set where
-  Z : ∀ {n c} → ↓c {S n} c fZ fZ
+  Z : ∀ {n c} → ↓c {S n} (S c) fZ fZ
   S< : ∀ {n i c j} → asℕ (fS i) < (S c) → ↓c c i j → ↓c {S n} (S c) (fS i) (fS j)
   S≥ : ∀ {n i c} → asℕ (fS i) ≥ c → ↓c {S n} c (fS i) i
 
-test-↓c-1 : ↓c {10} 0 fZ fZ
+test-↓c-1 : ↓c {10} 1 fZ fZ
 test-↓c-1 = Z
-test-↓c-2 : ↓c {10} 4 (fin 3) (fin 3)
-test-↓c-2 = S< (s<s (s<s (s<s z<s))) (S< (s<s (s<s z<s)) (S< (s<s z<s) Z))
-test-↓c-3 : ↓c {10} 3 (fin 3) (fin 2)
-test-↓c-3 = S≥ (s<s (s<s (s<s z<s)))
-test-↓c-4 : ↓c {10} 9 (fin 9) (fin 8)
-test-↓c-4 = S≥ (s<s (s<s (s<s (s<s (s<s (s<s (s<s (s<s (s<s z<s)))))))))
+test-↓c-2 : ∀ {n} → ¬ (Σ[ i ∈ Fin n ] ↓c 0 fZ i)
+test-↓c-2 (i , ())
+test-↓c-3 : ↓c {10} 4 (fin 3) (fin 3)
+test-↓c-3 = S< (s<s (s<s (s<s z<s))) (S< (s<s (s<s z<s)) (S< (s<s z<s) Z))
+test-↓c-4 : ↓c {10} 3 (fin 3) (fin 2)
+test-↓c-4 = S≥ (s<s (s<s (s<s z<s)))
 test-↓c-5 : ↓c 0 (fin {10} 3) (fin 2)
 test-↓c-5 = S≥ z<s
