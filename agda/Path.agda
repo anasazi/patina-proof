@@ -3,6 +3,7 @@ open import Type
 open import Layout
 open import Route
 open import Shape
+open import Loan
 
 module Path where
 
@@ -81,22 +82,22 @@ test-lvaddr-1 = var
 
 data _⊢_∶_shape {#x #ℓ} (Δ : Vec (Shape #ℓ) #x) : Path #x → Shape #ℓ → Set where
   var : ∀ {x} → Δ ⊢ var x ∶ Δ ! x shape
-  *~ : ∀ {p δ} → Δ ⊢ p ∶ ~ (init δ) shape → Δ ⊢ * p ∶ δ shape
-  *& : ∀ {p τ} → Δ ⊢ p ∶ & τ shape → Δ ⊢ * p ∶ init-t τ shape
+  *~ : ∀ {p B δ} → Δ ⊢ p ∶ ~ (init B δ) shape → Δ ⊢ * p ∶ δ shape
+  *& : ∀ {p B τ} → Δ ⊢ p ∶ & B τ shape → Δ ⊢ * p ∶ init-t τ shape
 
 _⊢_deep : ∀ {#x #ℓ} → Vec (Shape #ℓ) #x → Path #x → Set
 Δ ⊢ p deep = Σ[ δ ∈ Shape _ ] Δ ⊢ p ∶ δ shape × δ Full
 
-test-deep-1 : ([ int {0} (init tt) ]) ⊢ var fZ deep
-test-deep-1 = int (init tt) , (var , int)
+test-deep-1 : ([ int {0} (init (bank-def _) tt) ]) ⊢ var fZ deep
+test-deep-1 = int (init (bank [] free) tt) , (var , int)
 test-deep-2 : ¬ (([ int {0} void ]) ⊢ var fZ deep)
 test-deep-2 (.(int void) , (var , ()))
 
 data _⊢_≔_⇒_shape {#x #ℓ} : Vec (Shape #ℓ) #x → Path #x → Shape #ℓ → Vec (Shape #ℓ) #x → Set where
   var : ∀ {Δ x δ} → Δ ⊢ var x ≔ δ ⇒ set Δ x δ shape
-  * : ∀ {Δ p δ δ′ Δ′}
+  * : ∀ {Δ p B δ δ′ Δ′}
     → Δ ⊢ p ∶ ~ δ′ shape
-    → Δ ⊢ p ≔ ~ (init δ) ⇒ Δ′ shape
+    → Δ ⊢ p ≔ ~ (init B δ) ⇒ Δ′ shape
     → Δ ⊢ * p ≔ δ ⇒ Δ′ shape
   -- I don't think we need a version of &
 
@@ -106,36 +107,36 @@ _,_⊢_⇒_init : ∀ {#x #ℓ} → Vec (Type #ℓ) #x → Vec (Shape #ℓ) #x �
 test-init-1 : ([ int {0} ])
             , [ int void ]
             ⊢ var fZ
-            ⇒ [ int (init tt) ] init
+            ⇒ [ int (init (bank-def _) tt) ] init
 test-init-1 = int , (var , var)
 test-init-2 : ([ ~ {0} int ])
             , [ ~ void ]
             ⊢ * (var fZ)
-            ⇒ [ ~ (init (int (init tt))) ] init
+            ⇒ [ ~ (init (bank-def _) (int (init (bank-def _) tt))) ] init
 test-init-2 = int , (*~ var , * var var)
 test-init-3 : ([ ~ {0} int ])
-            , [ ~ (init (int void)) ]
+            , [ ~ (init (bank-def _) (int void)) ]
             ⊢ * (var fZ)
-            ⇒ [ ~ (init (int (init tt))) ] init
+            ⇒ [ ~ (init (bank-def _) (int (init (bank-def _) tt))) ] init
 test-init-3 = int , (*~ var , * var var)
 
 _,_⊢_⇒_deinit : ∀ {#x #ℓ} → Vec (Type #ℓ) #x → Vec (Shape #ℓ) #x → Path #x → Vec (Shape #ℓ) #x → Set
 Γ , Δ ⊢ p ⇒ Δ′ deinit = Σ[ τ ∈ Type _ ] Γ ⊢ p ∶ τ × (Δ ⊢ p ≔ void-t τ ⇒ Δ′ shape)
 
 test-deinit-1 : ([ int {0} ])
-              , [ int (init tt) ]
+              , [ int (init (bank-def _) tt) ]
               ⊢ var fZ
               ⇒ [ int void ] deinit
 test-deinit-1 = int , (var , var)
 test-deinit-2 : ([ ~ {0} int ])
-              , [ ~ (init (int (init tt))) ]
+              , [ ~ (init (bank-def _) (int (init (bank-def _) tt))) ]
               ⊢ var fZ
               ⇒ [ ~ void ] deinit
 test-deinit-2 = ~ int , (var , var)
 test-deinit-3 : ([ ~ {0} int ])
-              , [ ~ (init (int (init tt))) ]
+              , [ ~ (init (bank-def _) (int (init (bank-def _) tt))) ]
               ⊢ * (var fZ)
-              ⇒ [ ~ (init (int void)) ] deinit
+              ⇒ [ ~ (init (bank-def _) (int void)) ] deinit
 test-deinit-3 = int , (*~ var , * var var)
 
 _⊢_can-init : ∀ {#x #ℓ} → Vec (Shape #ℓ) #x → Path #x → Set

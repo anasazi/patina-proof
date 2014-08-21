@@ -4,6 +4,7 @@ open import Path
 open import Route
 open import Layout
 open import Shape
+open import Loan
 
 module Expr where
 
@@ -69,35 +70,37 @@ data _,_⊢_∶_,_expr {#x #ℓ} : Vec (Type #ℓ) #x → Vec (Shape #ℓ) #x �
        -- TODO well-formed check for τ
        → Γ , Δ ⊢ none τ ∶ opt τ , Δ expr
 
-test-rvok-1 : ([ int {0} ]) , [ int (init tt) ] ⊢ int 1 ∶ int , [ int (init tt) ] expr
+test-rvok-1 : ([ int {0} ]) , [ int (init (bank-def _) tt) ]
+            ⊢ int 1 ∶ int , [ int (init (bank-def _) tt) ] expr
 test-rvok-1 = int
 test-rvok-2 : ([ int {0} ,, int ])
-            , [ int (init tt) ,, int (init tt) ]
+            , [ int (init (bank-def _) tt) ,, int (init (bank-def _) tt) ]
             ⊢ add (var (fin 0)) (var (fin 1)) ∶ int
-            , [ int (init tt) ,, int (init tt) ] expr
-test-rvok-2 = add (copy var int (can-access (int (init tt) , (var , int))))
-                  (copy var int (can-access (int (init tt) , (var , int))))
+            , [ int (init (bank-def _) tt) ,, int (init (bank-def _) tt) ] expr
+test-rvok-2 = add (copy var int (can-access (int (init (bank [] free) tt) , (var , int))))
+                  (copy var int (can-access (int (init (bank [] free) tt) , (var , int))))
 test-rvok-3 : ¬ (([ int {0} ,, int ])
-            , [ int void ,, int (init tt) ]
+            , [ int void ,, int (init (bank-def _) tt) ]
             ⊢ add (var (fin 0)) (var (fin 1))
             ∶ int
-            , [ int void ,, int (init tt) ] expr)
+            , [ int void ,, int (init (bank-def _) tt) ] expr)
 test-rvok-3 (add (copy p∶τ τPOD (can-access (.(int void) , (var , ())))) p₂)
 test-rvok-3 (add (move p∶τ () pMove pDeinit) p₂)
 test-rvok-4 : ([ ~ {0} int ])
-            , [ ~ (init (int (init tt))) ]
+            , [ ~ (init (bank-def _) (int (init (bank-def _) tt))) ]
             ⊢ use (var fZ)
             ∶ ~ int
             , [ ~ void ] expr
 test-rvok-4 = use (move var
                         ~Aff
-                        (var , can-access (~ (init (int (init tt))) , (var , ~ int)))
+                        (var , can-access (~ (init (bank [] free) (int (init (bank [] free) tt)))
+                             , (var , ~ int)))
                         (~ int , (var , var)))
 test-rvok-5 : ([ int {0} ])
-            , [ int (init tt) ]
+            , [ int (init (bank-def _) tt) ]
             ⊢ new (var fZ) ∶ ~ int
-            , [ int (init tt) ] expr
-test-rvok-5 = new (copy var int (can-access (int (init tt) , (var , int))))
+            , [ int (init (bank-def _) tt) ] expr
+test-rvok-5 = new (copy var int (can-access (int (init (bank [] free) tt) , (var , int))))
 
 data _∣_,_,_⊢_←_⟶_∣_ {#x #ℓ} : (#aᵢ : ℕ)
                        → Vec (Type #ℓ) #x

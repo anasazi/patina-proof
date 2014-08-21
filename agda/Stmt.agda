@@ -7,6 +7,7 @@ open import Expr
 open import Route
 open import Layout
 open import Shape
+open import Loan
 
 module Stmt where
 
@@ -111,11 +112,14 @@ data stok {#f} (F : Vec (Func #f) #f) : (#x #ℓ : ℕ) → Vec (Type #ℓ) #x �
 record fnok {#f} (F : Vec (Func #f) #f) (func : Func #f) : Set where
   constructor fn
   field
+    {Δ} : Vec (Shape 1) _
     body-ok : stok F _ 1
                    (rev (args func))
                    (rev (map init-t (args func)))
                    (body func)
-                   (rev (map dropped-t (args func)))
+                   Δ --(rev {!!})
+    cleans-up : All (λ x → fst x ⊢ snd x Dropped) (zip (rev (args func)) Δ)
+                   --(rev (map dropped-t (args func)))
 -- record fnok {#f} (F : Vec (Func #f) #f) (func : Func #f) : Set where
 --   constructor fn
 --   field
@@ -173,13 +177,16 @@ data stok {#f} (F : Vec (Func #f) #f) where
              → Γ , Δ₀ ⊢ p ∶ opt τ , Δ₁ use
              -- arms of match are ok
              --→ stok F (S #x) {!!} {!!} (τ ∷ Γ) (init-from-type τ ∷ Δ₁) sₛ (δ ∷ Δ₂)
+             → (δ : Shape #ℓ)
+             → τ ⊢ δ Dropped
              → stok F (S #x) (S #ℓ)
                     (map (↑-#ℓ-t 1 0) (τ ∷ Γ))
                     (map (↑-#ℓ-sh 1 0) ((init-t τ) ∷ Δ₁))
                     sₛ
                     --(↑-#ℓ-sh 1 0 δ ∷ map (↑-#ℓ-sh 1 0) Δ₂)
                     --(map (↑-#ℓ-sh 1 0) (δ ∷ Δ₂))
-                    (map (↑-#ℓ-sh 1 0) (dropped-t τ ∷ Δ₂))
+                    (map (↑-#ℓ-sh 1 0) (δ ∷ Δ₂))
+                    --(map (↑-#ℓ-sh 1 0) (dropped-t τ ∷ Δ₂))
              → stok F #x #ℓ Γ Δ₁ sₙ Δ₂
              -- the some branch cleaned up after itself
              --→ S #x ∣ τ ∷ Γ , δ ∷ Δ₂ ⊢ var fZ dropped
@@ -194,16 +201,39 @@ test-stok-2 : stok [] 0 0 [] [] (push int (var fZ ⇐ int 1)) []
 test-stok-2 = push (⇐ok int (int void , (var , int)) var int (int , (var , var)))
                    (dropped-copy var int)
 test-stok-3 : stok [] 3 0 ([ opt int ,, int ,, int ])
-              ([ opt (init tt) ,, int (init tt) ,, int void ])
+              ([ opt (init (bank-def _) tt) ,, int (init (bank-def _) tt) ,, int void ])
               (matchbyval (var fZ)
                 (var (fin 3) ⇐ add (var (fin 0)) (var (fin 2)))
                 (var (fin 2) ⇐ int 0))
-              ([ opt (init tt) ,, int (init tt) ,, int (init tt) ])
-test-stok-3 = matchbyval (copy var (opt int) (can-access (opt (init tt) , (var , opt))))
-                         (⇐ok (add (copy var int (can-access (int (init tt) , (var , int))))
-                                   (copy var int (can-access (int (init tt) , (var , int)))))
+              ([ opt (init (bank-def _) tt) ,, int (init (bank-def _) tt) ,, int (init (bank-def _) tt) ])
+test-stok-3 = matchbyval (copy var (opt int) (can-access (_ , (var , opt))))
+                         (int (init (bank [] free) tt))
+                         int
+                         (⇐ok (add (copy var int (can-access (_ , (var , int))))
+                                   (copy var int (can-access (_ , (var , int)))))
+                              (int void , (var , int)) var int (int , (var , var)))
+                         (⇐ok int (int void , (var , int)) var int (int , (var , var)))
+              {-
+test-stok-3 = matchbyval (copy var (opt int)
+                               (can-access ((opt (init (bank [] free) tt)) , (var , opt))))
+                         (int (init (bank [] free) tt))
+                         int
+                         (⇐ok (add (copy var int
+                                         (can-access ((int (init (bank (free ∷ []) free) tt))
+                                                     , (var , int))))
+                                   (copy var int
+                                         (can-access ((int (init (bank (free ∷ []) free) tt))
+                                                     , (var , int)))))
+                              ((int void) , (var , int)) var int (int , (var , var)))
+                         (⇐ok int ((int void) , (var , int)) var int (int , (var , var)))
+                         -}
+              {-
+test-stok-3 = matchbyval (copy var (opt int) (can-access (opt (init {!!} tt) , (var , opt))))
+                         (⇐ok (add (copy var int (can-access (int (init {!!} tt) , (var , int))))
+                                   (copy var int (can-access (int (init {!!} tt) , (var , int)))))
                               ((int void) , (var , int)) var int (int , (var , var)))
                          (⇐ok int (int void , (var , int)) var int (int , (var , var)))
+                         -}
               {-
 test-stok-3 = matchbyval (copy var (opt int) (can-access (opt (init tt) , (var , opt))))
                          (⇐ok (add (copy var int (can-access (int (init tt) , (var , int))))
@@ -212,10 +242,10 @@ test-stok-3 = matchbyval (copy var (opt int) (can-access (opt (init tt) , (var ,
                          (⇐ok int (int void , (var , int)) var int (int , (var , var)))
                          (dropped-copy var int)
                          -}
-test-stok-4 : stok [] 1 0 ([ ~ int ]) ([ ~ (init (int (init tt))) ])
+test-stok-4 : stok [] 1 0 ([ ~ int ]) ([ ~ (init (bank-def _) (int (init (bank-def _) tt))) ])
               (free (var fZ)) ([ ~ void ])
 test-stok-4 = free var (dropped-copy (*~ var) int) (~ int , (var , var))
-test-stok-5 : ¬ (stok [] 1 0 ([ ~ (~ int) ]) ([ ~ (init (~ (init (int (init tt))))) ])
+test-stok-5 : ¬ (stok [] 1 0 ([ ~ (~ int) ]) ([ ~ (init (bank-def _) (~ (init (bank-def _) (int (init (bank-def _) tt))))) ])
                 (skip pop skip) ([ ~ void ]))
 test-stok-5 (() pop skip)
 test-stok-6 : stok [] 1 0 ([ ~ (~ int) ]) ([ ~ void ]) (skip pop skip) ([ ~ void ])
@@ -223,29 +253,40 @@ test-stok-6 = skip pop skip
 test-stok-7 : stok ([ fn ([ int ,, int ]) skip ])
                    2 0 
                    ([ int ,, int ])
-                   ([ int (init tt) ,, int (init tt) ])
+                   ([ int (init (bank-def _) tt) ,, int (init (bank-def _) tt) ])
                    (call fZ ([ var (fin 0) ,, var (fin 1) ]))
-                   ([ int (init tt) ,, int (init tt) ])
+                   ([ int (init (bank-def _) tt) ,, int (init (bank-def _) tt) ])
+test-stok-7 = call (fn skip (int ∷ int ∷ []))
+                   (copy var int (can-access ((int (init (bank [] free) tt)) , (var , int)))
+                  ∷ copy var int (can-access ((int (init (bank [] free) tt)) , (var , int)))
+                  ∷ [])
+                   (int ∷ int ∷ [])
+{-
 test-stok-7 = call (fn skip)
-                   ( copy var int (can-access (int (init tt) , (var , int)))
-                   ∷ copy var int (can-access (int (init tt) , (var , int)))
+                   ( copy var int (can-access (int (init {!!} tt) , (var , int)))
+                   ∷ copy var int (can-access (int (init {!!} tt) , (var , int)))
                    ∷ [])
                    (int ∷ int ∷ [])
+                   -}
 test-stok-8 : stok [] 1 3
               ([ & (val (fin 1)) imm (& (val (fin 2)) imm int) ])
-              ([ & (& (val (fin 2)) imm int) ])
+              ([ & (bank-def _) (& (val (fin 2)) imm int) ])
               (skip endregion skip)
-              ([ & (& (val (fin 2)) imm int) ])
+              ([ & (bank-def _) (& (val (fin 2)) imm int) ])
 test-stok-8 = skip
             ∣ & (S≥ z<s) (& (S≥ z<s) int) ∷ []
-            , & (& (S≥ z<s) int) ∷ []
+            , & (refl , Z) (& (S≥ z<s) int) ∷ []
             endregion skip
 
 test-fnok-1 : fnok [] (fn ([ ~ int ,, ~ int ]) (free (var fZ) seq free (var (fin 1))))
-test-fnok-1 = fn (free var (dropped-copy (*~ var) int) ((~ int) , (var , var)) seq
-                  free var (dropped-copy (*~ var) int) (~ int , (var , var)))
+test-fnok-1 = fn ((free var (dropped-copy (*~ var) int) ((~ int) , (var , var))) seq
+                  (free var (dropped-copy (*~ var) int) ((~ int) , (var , var))))
+                 (~ ∷ ~ ∷ [])
+--test-fnok-1 = fn (free var (dropped-copy (*~ var) int) ((~ int) , (var , var)) seq
+                  --free var (dropped-copy (*~ var) int) (~ int , (var , var)))
 test-fnok-2 : ¬ (fnok [] (fn ([ ~ int ]) skip))
-test-fnok-2 (fn ())
+test-fnok-2 (fn skip (() ∷ []))
+--test-fnok-2 (fn ())
 -- test-fnok-1 : fnok [] (fn ([ ~ int ,, ~ int ]) (free (var fZ) seq free (var (fin 1))))
 -- test-fnok-1 = fn (free var (dropped-copy (*~ var) int) ((~ int) , (var , var))
 --                    seq free var (dropped-copy (*~ var) int) ((~ int) , (var , var)))
