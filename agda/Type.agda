@@ -4,6 +4,9 @@ open import Mut
 
 module Type where
 
+{-
+Types are indexed by the lifetime relation (so the lifetimes of & are always well-formed).
+-}
 data Type (#ℓ : ℕ) : Set where
   int : Type #ℓ
   ~ : Type #ℓ → Type #ℓ
@@ -18,6 +21,7 @@ EqType : Eq Type
 EqType = record { _==_ = _=type=_ }
 -}
 
+-- Upshift the #ℓ index by d with a cutoff of c
 ↑-#ℓ-t : ∀ {#ℓ} → (d : ℕ) → ℕ → Type #ℓ → Type (plus d #ℓ)
 ↑-#ℓ-t d c int = int
 ↑-#ℓ-t d c (~ τ) = ~ (↑-#ℓ-t d c τ)
@@ -46,6 +50,7 @@ EqType = record { _==_ = _=type=_ }
 ↑-#Ł-t′ {#Ł} d c τ rewrite plus-comm #Ł d = ↑-#Ł-t d c τ
 -}
 
+-- Downshift the index #ℓ by 1 with a cutoff of c
 data ↓1-#ℓ-t {#ℓ} : ℕ → Type (S #ℓ) → Type #ℓ → Set where
   int : ∀ {c} → ↓1-#ℓ-t c int int
   ~ : ∀ {c τ τ′} → ↓1-#ℓ-t c τ τ′ → ↓1-#ℓ-t c (~ τ) (~ τ′)
@@ -69,12 +74,22 @@ test-↓1-#ℓ-t-2 = & Z int
 test-↓1-#ℓ-t-3 : ↓1-#ℓ-t {5} 3 (& (val (fin 3)) imm int) (& (val (fin 2)) imm int)
 test-↓1-#ℓ-t-3 = & (S≥ (s<s (s<s (s<s z<s)))) int
 
+-- The subtyping relationship
 data _<:_ {#ℓ} : Type #ℓ → Type #ℓ → Set where
   int : int <: int
-  ~ : ∀ {τ₁ τ₂} → τ₁ <: τ₂ → ~ τ₁ <: ~ τ₂
-  &imm : ∀ {ℓ₁ ℓ₂ τ₁ τ₂} → #ℓ ∣ ℓ₂ <: ℓ₁ → τ₁ <: τ₂ → & ℓ₁ imm τ₁ <: & ℓ₂ imm τ₂
-  &mut : ∀ {ℓ₁ ℓ₂ τ} → #ℓ ∣ ℓ₂ <: ℓ₁ → & ℓ₁ mut τ <: & ℓ₂ mut τ
-  opt : ∀ {τ₁ τ₂} → τ₁ <: τ₂ → opt τ₁ <: opt τ₂
+  ~ : ∀ {τ₁ τ₂}
+    → τ₁ <: τ₂
+    → ~ τ₁ <: ~ τ₂
+  &imm : ∀ {ℓ₁ ℓ₂ τ₁ τ₂}
+       → #ℓ ∣ ℓ₂ <: ℓ₁
+       → τ₁ <: τ₂
+       → & ℓ₁ imm τ₁ <: & ℓ₂ imm τ₂
+  &mut : ∀ {ℓ₁ ℓ₂ τ}
+       → #ℓ ∣ ℓ₂ <: ℓ₁
+       → & ℓ₁ mut τ <: & ℓ₂ mut τ
+  opt : ∀ {τ₁ τ₂}
+      → τ₁ <: τ₂
+      → opt τ₁ <: opt τ₂
 
 test-subtype-1 : int {0} <: int
 test-subtype-1 = int
@@ -95,16 +110,19 @@ data sizeof : Type → ℕ → Set where
   opt : ∀ {τ n} → sizeof τ n → sizeof (opt τ) (S n)
   -}
 
+-- Predicate for implicitly copyable types
 data _Copy {#ℓ} : Type #ℓ → Set where
   int : int Copy
   &imm : ∀ {ℓ τ} → & ℓ imm τ Copy
   opt : ∀ {τ} → τ Copy → opt τ Copy
 
+-- Predicate for affine types
 data _Affine {#ℓ} : Type #ℓ → Set where
   ~Aff : ∀ {τ} → ~ τ Affine
   &mut : ∀ {ℓ τ} → & ℓ mut τ Affine
   opt : ∀ {τ} → τ Affine → opt τ Affine
 
+-- No type is both Copy and Affine
 copy×affine≡⊥ : ∀ {#ℓ} → (τ : Type #ℓ) → ¬ (τ Copy × τ Affine)
 copy×affine≡⊥ int (copy , ())
 copy×affine≡⊥ (~ τ) (() , affine)
@@ -112,6 +130,7 @@ copy×affine≡⊥ (& ℓ imm τ) (copy , ())
 copy×affine≡⊥ (& ℓ mut τ) (() , affine)
 copy×affine≡⊥ (opt τ) (opt copy , opt affine) = copy×affine≡⊥ τ (copy , affine)
 
+-- Every type is either Copy or Affine
 copy+affine≡⊤ : ∀ {#ℓ} → (τ : Type #ℓ) → τ Copy + τ Affine
 copy+affine≡⊤ int = inl int
 copy+affine≡⊤ (~ τ) = inr ~Aff
@@ -121,27 +140,34 @@ copy+affine≡⊤ (opt τ) with copy+affine≡⊤ τ
 copy+affine≡⊤ (opt τ) | inl copy = inl (opt copy)
 copy+affine≡⊤ (opt τ) | inr affine = inr (opt affine)
 
+-- Thus, Affine is a correct negation of Copy
+
+-- Predicate for types which must drop heap memory
 data _Drop {#ℓ} : Type #ℓ → Set where
   ~ : ∀ {τ} → ~ τ Drop
   opt : ∀ {τ} → τ Drop → opt τ Drop
 
+-- Predicate for types which do not need to drop heap memory
 data _¬Drop {#ℓ} : Type #ℓ → Set where
   int : int ¬Drop
   & : ∀ {ℓ μ τ} → & ℓ μ τ ¬Drop
   opt : ∀ {τ} → τ ¬Drop → opt τ ¬Drop
 
+-- No type is both Copy and Drop
 drop×copy≡⊥ : ∀ {#ℓ} → (τ : Type #ℓ) → ¬ (τ Drop × τ Copy)
 drop×copy≡⊥ int (() , copy)
 drop×copy≡⊥ (~ τ) (drop , ())
 drop×copy≡⊥ (& ℓ μ τ) (() , copy)
 drop×copy≡⊥ (opt τ) (opt drop , opt copy) = drop×copy≡⊥ τ (drop , copy)
 
+-- No type is both Drop and ¬Drop
 drop×¬drop≡⊥ : ∀ {#ℓ} → (τ : Type #ℓ) → ¬ (τ Drop × τ ¬Drop)
 drop×¬drop≡⊥ int (() , ¬drop)
 drop×¬drop≡⊥ (~ τ) (drop , ())
 drop×¬drop≡⊥ (& ℓ μ τ) (() , ¬drop)
 drop×¬drop≡⊥ (opt τ) (opt drop , opt ¬drop) = drop×¬drop≡⊥ τ (drop , ¬drop)
 
+-- Every type is either Drop or ¬Drop
 drop+¬drop≡⊤ : ∀ {#ℓ} → (τ : Type #ℓ) → τ Drop + τ ¬Drop
 drop+¬drop≡⊤ int = inr int
 drop+¬drop≡⊤ (~ τ) = inl ~
@@ -150,5 +176,8 @@ drop+¬drop≡⊤ (opt τ) with drop+¬drop≡⊤ τ
 drop+¬drop≡⊤ (opt τ) | inl drop = inl (opt drop)
 drop+¬drop≡⊤ (opt τ) | inr ¬drop = inr (opt ¬drop)
 
+-- Thus ¬Drop is a correct negation of Drop
+
+-- nicer name for the above proof
 _Drop? : ∀ {#ℓ} → (τ : Type #ℓ) → τ Drop + τ ¬Drop
 _Drop? τ = drop+¬drop≡⊤ τ
