@@ -14,16 +14,16 @@ Routes serve the purposes of addresses.
 module Layout where
 
 -- A slot of memory that might store a value (i.e. a Maybe or Option)
-data Value (A : Set) : Set where
-  void : Value A
-  val : A → Value A
+data Slot (A : Set) : Set where
+  void : Slot A
+  val : A → Slot A
 
 -- Layouts are indexed by the number of allocations in the heap (b/c of Routes)
 data Layout (#a : ℕ) : Set where
   -- A slot for an integer
-  int : Value ℕ → Layout #a
+  int : Slot ℕ → Layout #a
   -- A slot for a pointer (represented as a Route)
-  ptr : Value (Route #a) → Layout #a
+  ptr : Slot (Route #a) → Layout #a
   {- A contiguous list of layouts (i.e. a struct or an option).
      Note that the list itself is not a value (no overhead).
      Using a Vec makes it easy to check projections for correctness. -} 
@@ -41,7 +41,7 @@ data Layout (#a : ℕ) : Set where
 ↑-alloc-ls d c [] = []
 ↑-alloc-ls d c (l ∷ ls) = ↑-alloc-l d c l ∷ ↑-alloc-ls d c ls
 
-data ↓-#a-vr {#a} : ℕ → Value (Route (S #a)) → Value (Route #a) → Set where
+data ↓-#a-vr {#a} : ℕ → Slot (Route (S #a)) → Slot (Route #a) → Set where
   void : ∀ {c} → ↓-#a-vr c void void
   val : ∀ {c r r′} → ↓-#a-r c r r′ → ↓-#a-vr c (val r) (val r′)
 
