@@ -61,10 +61,10 @@ test-↑-2 = refl
 ↑-var-p′′′ {#x} d c p rewrite plus-comm d #x = ↑-var-p′′ d c p
 
 -- Typing for Paths. Given a mapping from variables to types (i.e. a Vector of Types #x long).
-data _⊢_∶_ {#x #ℓ} : Context #ℓ #x → Path #x → Type #ℓ → Set where
-  var : ∀ {Γ x} → Γ ⊢ var x ∶ (Γ ! x)
-  *~ : ∀ {Γ p τ} → Γ ⊢ p ∶ ~ τ → Γ ⊢ * p ∶ τ
-  *& : ∀ {Γ p ℓ μ τ} → Γ ⊢ p ∶ & ℓ μ τ → Γ ⊢ * p ∶ τ
+data _⊢_∶_ {#x #ℓ} (Γ : Context #ℓ #x) : Path #x → Type #ℓ → Set where
+  var : ∀ {x} → Γ ⊢ var x ∶ (Γ ! x)
+  *~ : ∀ {p τ} → Γ ⊢ p ∶ ~ τ → Γ ⊢ * p ∶ τ
+  *& : ∀ {p ℓ μ τ} → Γ ⊢ p ∶ & ℓ μ τ → Γ ⊢ * p ∶ τ
 
 test-lvtype-1 : ([ int {0} ,, int ]) ⊢ var (fin 0) ∶ int
 test-lvtype-1 = var
