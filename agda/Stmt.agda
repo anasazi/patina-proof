@@ -145,18 +145,9 @@ record fnok {#f} (F : Vec (Func #f) #f) (func : Func #f) : Set where
                    (rev (args func))
                    (rev (map init-t (args func)))
                    (body func)
-                   Δ --(rev {!!})
+                   Δ
     -- The body cleans up after itself (freeing any heap memory it was responsible for)
     cleans-up : All (λ x → fst x ⊢ snd x Dropped) (zip (rev (args func)) Δ)
-                   --(rev (map dropped-t (args func)))
--- record fnok {#f} (F : Vec (Func #f) #f) (func : Func #f) : Set where
---   constructor fn
---   field
---     {Δ} : Vec (Shape 0 0) _
---     body-ok : stok F _ 0 0 (rev (args func))
---                    (rev (map init-from-type (args func))) (body func) Δ
---     cleans-up : All (λ x → _ ∣ rev (args func) , Δ ⊢ var x dropped)
---                     (range′ (#args func)) 
 
 data stok {#f} (F : Vec (Func #f) #f) where
   -- Skip changes nothing
@@ -171,7 +162,7 @@ data stok {#f} (F : Vec (Func #f) #f) where
        -- is well typed when the context is extended
        → stok F (S #x) #ℓ (τ ∷ Γ) (void-t τ ∷ Δ) s (δ′ ∷ Δ′)
        -- cleans up after itself if necessary
-       → S #x ∣ τ ∷ Γ , δ′ ∷ Δ′ ⊢ var fZ dropped
+       → τ ⊢ δ′ Dropped
        → stok F #x #ℓ Γ Δ (push τ s) Δ′
   -- Pop is just a flag to the evalutator
   pop : ∀ {#x #ℓ Γ Δ s Δ′}
@@ -202,11 +193,12 @@ data stok {#f} (F : Vec (Func #f) #f) where
       → Γ , Δ₁ ⊢ p ⇒ Δ₂ init
       → stok F #x #ℓ Γ Δ₀ (p ⇐ e) Δ₂
   -- Free is ok if
-  free : ∀ {#x #ℓ Γ Δ₀ p τ Δ₁}
+  free : ∀ {#x #ℓ Γ Δ₀ p τ δ Δ₁}
        -- The argument is a unique pointer
        → Γ ⊢ p ∶ ~ τ
        -- With cleaned up contents
-       → #x ∣ Γ , Δ₀ ⊢ * p dropped
+       → Δ₀ ⊢ * p ∶ δ shape
+       → τ ⊢ δ Dropped
        -- So we mark it as deinitialized in the output
        → Γ , Δ₀ ⊢ p ⇒ Δ₁ deinit
        → stok F #x #ℓ Γ Δ₀ (free p) Δ₁
@@ -246,10 +238,9 @@ data stok {#f} (F : Vec (Func #f) #f) where
              → stok F #x #ℓ Γ Δ₀ (matchbyval p sₛ sₙ) Δ₂
 
 test-stok-1 : stok [] 0 0 [] [] (push int skip) []
-test-stok-1 = push skip (dropped-Δ (var int))
+test-stok-1 = push skip int
 test-stok-2 : stok [] 0 0 [] [] (push int (var fZ ⇐ int 1)) []
-test-stok-2 = push (⇐ok int (int void , (var , int)) var int (int , (var , var)))
-                   (dropped-copy var int)
+test-stok-2 = push (⇐ok int (int void , (var , int)) var int (int , (var , var))) int
 test-stok-3 : stok [] 3 0 ([ opt int ,, int ,, int ])
               ([ opt (init (bank-def _) tt) ,, int (init (bank-def _) tt) ,, int void ])
               (matchbyval (var fZ)
@@ -265,7 +256,7 @@ test-stok-3 = matchbyval (copy var (opt int) (can-access (_ , (var , opt))))
                          (⇐ok int (int void , (var , int)) var int (int , (var , var)))
 test-stok-4 : stok [] 1 0 ([ ~ int ]) ([ ~ (init (bank-def _) (int (init (bank-def _) tt))) ])
               (free (var fZ)) ([ ~ void ])
-test-stok-4 = free var (dropped-copy (*~ var) int) (~ int , (var , var))
+test-stok-4 = free var (*~ var) int (~ int , (var , var))
 test-stok-5 : ¬ (stok [] 1 0 ([ ~ (~ int) ]) ([ ~ (init (bank-def _) (~ (init (bank-def _) (int (init (bank-def _) tt))))) ])
                 (pop skip) ([ ~ void ]))
 test-stok-5 (pop ())
@@ -290,18 +281,11 @@ test-stok-8 : stok [] 1 3
 test-stok-8 = unregion skip
 
 test-fnok-1 : fnok [] (fn ([ ~ int ,, ~ int ]) (free (var fZ) seq free (var (fin 1))))
-test-fnok-1 = fn ((free var (dropped-copy (*~ var) int) ((~ int) , (var , var))) seq
-                  (free var (dropped-copy (*~ var) int) ((~ int) , (var , var))))
+test-fnok-1 = fn (free var (*~ var) int (~ int , (var , var)) seq
+                  free var (*~ var) int (~ int , (var , var)))
                  (~ ∷ ~ ∷ [])
 test-fnok-2 : ¬ (fnok [] (fn ([ ~ int ]) skip))
 test-fnok-2 (fn skip (() ∷ []))
--- test-fnok-1 : fnok [] (fn ([ ~ int ,, ~ int ]) (free (var fZ) seq free (var (fin 1))))
--- test-fnok-1 = fn (free var (dropped-copy (*~ var) int) ((~ int) , (var , var))
---                    seq free var (dropped-copy (*~ var) int) ((~ int) , (var , var)))
---                   (dropped-Δ (var ~) ∷ dropped-Δ (var ~) ∷ [])
--- test-fnok-2 : ¬ (fnok [] (fn ([ ~ int ]) skip))
--- test-fnok-2 (fn skip (dropped-Δ (var ()) ∷ []))
--- test-fnok-2 (fn skip (dropped-copy var () ∷ []))
 
 -- Statement evalutation can change the number of variables, allocations, or the lifetime relation
 data stev {#f} (F : Vec (Func #f) #f) : (#x₁ #a₁ #ℓ₁ : ℕ) → Vec (Type #ℓ₁) #x₁ → Vec (Fin #a₁) #x₁
