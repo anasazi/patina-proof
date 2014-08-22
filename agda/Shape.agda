@@ -58,6 +58,8 @@ data Shape (#ℓ : ℕ) : Set where
   -- Borrowed references may point to some Type (which we know is initialized thanks to the borrow)
   & : Hole (Type #ℓ) #ℓ → Shape #ℓ
   -- Options effectively have no internal structure to paths, so we simply use Hole ⊤
+  -- TODO maybe we should add an always present Type field for the type of the payload
+  -- might be useful for checking layouts
   opt : Hole ⊤ #ℓ → Shape #ℓ
 -- --  struct : ∀ {n} → Vec (Shape #x) n → Shape #x
 
