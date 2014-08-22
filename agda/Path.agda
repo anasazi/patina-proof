@@ -89,24 +89,20 @@ data _⊢_∶_shape {#x #ℓ} (Δ : State #ℓ #x) : Path #x → Shape #ℓ → 
   *& : ∀ {p B τ} → Δ ⊢ p ∶ & (init B τ) shape → Δ ⊢ * p ∶ init-t τ shape
 
 -- Under a well-typed State, shapes have the same types as the paths that point to them
-shapes-preserve-types : ∀ {#ℓ #x} (Γ : Context #ℓ #x) Δ p τ δ
+shapes-preserve-types : ∀ {#ℓ #x} {Γ : Context #ℓ #x} {Δ} p {τ δ}
                       → Γ ⊢ Δ state
                       → Γ ⊢ p ∶ τ
                       → Δ ⊢ p ∶ δ shape
                       → τ ⊢ δ shape
-shapes-preserve-types Γ Δ (var x) .(Γ ! x) .(Δ ! x) Γ⊢Δ var var = Γ⊢Δ All2! x
-shapes-preserve-types Γ Δ (* p) τ δ Γ⊢Δ (*~ p∶τ) (*~ p∶δ)
-  with shapes-preserve-types Γ Δ p (~ τ) (~ _) Γ⊢Δ p∶τ p∶δ
+shapes-preserve-types (var x) Γ⊢Δ var var = Γ⊢Δ All2! x
+shapes-preserve-types (* p) Γ⊢Δ (*~ p∶τ) (*~ p∶δ) with shapes-preserve-types p Γ⊢Δ p∶τ p∶δ
 ... | ~ ih = ih
-shapes-preserve-types Γ Δ (* p) τ ._ Γ⊢Δ (*~ p∶τ) (*& p∶δ)
-  with shapes-preserve-types Γ Δ p (~ τ) (& _) Γ⊢Δ p∶τ p∶δ
+shapes-preserve-types (* p) Γ⊢Δ (*~ p∶τ) (*& p∶δ) with shapes-preserve-types p Γ⊢Δ p∶τ p∶δ
 ... | ()
-shapes-preserve-types Γ Δ (* p) τ δ Γ⊢Δ (*& p∶τ) (*~ p∶δ)
-  with shapes-preserve-types Γ Δ p (& _ _ τ) (~ _) Γ⊢Δ p∶τ p∶δ
+shapes-preserve-types (* p) Γ⊢Δ (*& p∶τ) (*~ p∶δ) with shapes-preserve-types p Γ⊢Δ p∶τ p∶δ
 ... | ()
-shapes-preserve-types Γ Δ (* p) τ ._ Γ⊢Δ (*& p∶τ) (*& p∶δ)
-  with shapes-preserve-types Γ Δ p (& _ _ τ) (& _) Γ⊢Δ p∶τ p∶δ
-... | & = init-t-well-typed τ
+shapes-preserve-types (* p) Γ⊢Δ (*& p∶τ) (*& p∶δ) with shapes-preserve-types p Γ⊢Δ p∶τ p∶δ
+... | & = init-t-well-typed _
 
 -- A Path is deeply initialized if it has a Full shape.
 _⊢_deep : ∀ {#x #ℓ} → State #ℓ #x → Path #x → Set
