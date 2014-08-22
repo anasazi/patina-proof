@@ -112,3 +112,7 @@ data _⊢_∶_layout {#a #ℓ} (σ : Vec (Type #ℓ) #a) : Layout #a → Type #�
 --  rec : ∀ {n} {ls : Vec (Layout #a) n} {τs : Vec Type n}
 --      → All (λ {(l , τ) → σ ⊢ l ∶ τ layout}) (zip ls τs)
 --      → σ ⊢ rec ls ∶ rec τs layout
+
+-- Consistency of heap types
+_,_⊢_heap-type : ∀ {#ℓ #x #a} → Context #ℓ #x → Map #a #x → Context #ℓ #a → Set
+Γ , V ⊢ σ heap-type = All2 (λ τ α → τ ≡ σ ! α) Γ V
