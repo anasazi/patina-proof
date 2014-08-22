@@ -13,13 +13,49 @@ data Type (#ℓ : ℕ) : Set where
   & : Life #ℓ → Mut → Type #ℓ → Type #ℓ
   opt : Type #ℓ → Type #ℓ
 
-  {-
-_=type=_ : (τ₁ τ₂ : Type) → Dec (τ₁ ≡ τ₂)
-int =type= int = yes refl
+private
+  ~-inj : ∀ {#ℓ} {τ₁ τ₂ : Type #ℓ} → ~ τ₁ ≡ ~ τ₂ → τ₁ ≡ τ₂
+  ~-inj refl = refl
+  &-inj : ∀ {#ℓ μ} {ℓ₁ ℓ₂ : Life #ℓ} {τ₁ τ₂ : Type #ℓ} → & ℓ₁ μ τ₁ ≡ & ℓ₂ μ τ₂ → ℓ₁ ≡ ℓ₂ × τ₁ ≡ τ₂
+  &-inj refl = refl , refl
+  opt-inj : ∀ {#ℓ} {τ₁ τ₂ : Type #ℓ} → opt τ₁ ≡ opt τ₂ → τ₁ ≡ τ₂
+  opt-inj refl = refl
 
-EqType : Eq Type
+  _=type=_ : ∀  {#ℓ} → (τ₁ τ₂ : Type #ℓ) → Dec (τ₁ ≡ τ₂)
+  int =type= int = yes refl
+  int =type= ~ τ₂ = no (λ ())
+  int =type= & ℓ₂ μ₂ τ₂ = no (λ ())
+  int =type= opt τ₂ = no (λ ())
+  ~ τ₁ =type= int = no (λ ())
+  ~ τ₁ =type= ~ τ₂ with τ₁ =type= τ₂
+  ~ τ₁ =type= ~ .τ₁ | yes refl = yes refl
+  ~ τ₁ =type= ~ τ₂ | no neq = no (neq ∘ ~-inj)
+  ~ τ₁ =type= & ℓ₂ μ₂ τ₂ = no (λ ())
+  ~ τ₁ =type= opt τ₂ = no (λ ())
+  & ℓ₁ μ₁ τ₁ =type= int = no (λ ())
+  & ℓ₁ μ₁ τ₁ =type= ~ τ₂ = no (λ ())
+  & ℓ₁ imm τ₁ =type= & ℓ₂ imm τ₂ with ℓ₁ == ℓ₂
+  & ℓ₁ imm τ₁ =type= & .ℓ₁ imm τ₂ | yes refl with τ₁ =type= τ₂
+  & ℓ₁ imm τ₁ =type= & .ℓ₁ imm .τ₁ | yes refl | yes refl = yes refl
+  & ℓ₁ imm τ₁ =type= & .ℓ₁ imm τ₂ | yes refl | no neq = no (neq ∘ snd ∘ &-inj)
+  & ℓ₁ imm τ₁ =type= & ℓ₂ imm τ₂ | no neq = no (neq ∘ fst ∘ &-inj)
+  & ℓ₁ imm τ₁ =type= & ℓ₂ mut τ₂ = no (λ ())
+  & ℓ₁ mut τ₁ =type= & ℓ₂ imm τ₂ = no (λ ())
+  & ℓ₁ mut τ₁ =type= & ℓ₂ mut τ₂ with ℓ₁ == ℓ₂
+  & ℓ₁ mut τ₁ =type= & .ℓ₁ mut τ₂ | yes refl with τ₁ =type= τ₂
+  & ℓ₁ mut τ₁ =type= & .ℓ₁ mut .τ₁ | yes refl | yes refl = yes refl
+  & ℓ₁ mut τ₁ =type= & .ℓ₁ mut τ₂ | yes refl | no neq = no (neq ∘ snd ∘ &-inj)
+  & ℓ₁ mut τ₁ =type= & ℓ₂ mut τ₂ | no neq = no (neq ∘ fst ∘ &-inj)
+  & ℓ₁ μ₁ τ₁ =type= opt τ₂ = no (λ ())
+  opt τ₁ =type= int = no (λ ())
+  opt τ₁ =type= ~ τ₂ = no (λ ())
+  opt τ₁ =type= & ℓ₂ μ₂ τ₂ = no (λ ())
+  opt τ₁ =type= opt τ₂ with τ₁ =type= τ₂
+  opt τ₂ =type= opt .τ₂ | yes refl = yes refl
+  opt τ₁ =type= opt τ₂ | no neq = no (neq ∘ opt-inj)
+
+EqType : ∀ {#ℓ} → Eq (Type #ℓ)
 EqType = record { _==_ = _=type=_ }
--}
 
 -- A context is a vector of types (variables -> types)
 Context : ℕ → ℕ → Set
