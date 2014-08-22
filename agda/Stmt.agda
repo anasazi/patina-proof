@@ -11,28 +11,49 @@ open import Loan
 
 module Stmt where
 
+{-
+Statements are indexed by:
+- number of functions
+- number of free variables
+- the lifetime relation
+-}
 data Stmt : (#f #x #ℓ : ℕ) → Set
 
+-- Functions are indexed by the number of functions (allows recursive calls)
+-- TODO handle lifetime variables
 record Func (#f : ℕ) : Set where
   constructor fn
   field
-    {#args} : ℕ
+    {#args} : ℕ -- implicit number of arguments
+    -- The arguments do not have the surrounding lifetime relation in scope
     args : Vec (Type 1) #args
+    -- The body has the arguments in scope
     body : Stmt #f #args 1
 open Func
 
 data Stmt where
+  -- Do nothing
   skip : ∀ {#f #x #ℓ} → Stmt #f #x #ℓ
+  -- Sequence two statements with the *same* indicies
   _seq_ : ∀ {#f #x #ℓ} → Stmt #f #x #ℓ → Stmt #f #x #ℓ → Stmt #f #x #ℓ
+  -- Create a new variable of the provided type and a Stmt where it is in scope
   push : ∀ {#f #x #ℓ} → Type #ℓ → Stmt #f (S #x) #ℓ → Stmt #f #x #ℓ
+  -- Pop a stack variable once the wrapped statement finishes
   pop : ∀ {#f #x #ℓ} → Stmt #f (S #x) #ℓ → Stmt #f (S #x) #ℓ
+  -- Create a new concrete lifetime value and a Stmt where it is in scope
   region : ∀ {#f #x #ℓ} → Stmt #f #x (S #ℓ) → Stmt #f #x #ℓ
+  -- Pop a concrete lifetime value once the wrapped statement finishes
   unregion : ∀ {#f #x #ℓ} → Stmt #f #x (S #ℓ) → Stmt #f #x (S #ℓ)
+  -- Assignment
   _⇐_ : ∀ {#f #x #ℓ} → Path #x → Expr #x #ℓ → Stmt #f #x #ℓ
+  -- Free heap memory
   free : ∀ {#f #x #ℓ} → Path #x → Stmt #f #x #ℓ
+  -- Call a function
   call : ∀ {#f #x #ℓ n} → Fin #f → Vec (Path #x) n → Stmt #f #x #ℓ
+  -- Match by value (the Some block has an extra variable and lifetime in scope)
   matchbyval : ∀ {#f #x #ℓ} → Path #x → Stmt #f (S #x) (S #ℓ) → Stmt #f #x #ℓ → Stmt #f #x #ℓ
 
+-- Upshifting for the #x and #ℓ indicies of Stmt
 ↑-var-s : ∀ {#f #x #ℓ} → (d : ℕ) → ℕ → Stmt #f #x #ℓ → Stmt #f (plus #x d) #ℓ
 ↑-var-s d c skip = skip
 ↑-var-s d c (s₁ seq s₂) = ↑-var-s d c s₁ seq ↑-var-s d c s₂
@@ -82,6 +103,10 @@ data Stmt where
 ↑-#Ł-s′ {_} {_} {_} {#Ł} d c s rewrite plus-comm d #Ł = ↑-#Ł-s d c s
 -}
 
+{-
+Converting a function body into a statement
+Basically, we wrap the body in push statements for the arguments and then one region statement for the block lifetime
+-}
 conv-helper : ∀ {n #x #f #ℓ} → Vec (Type #ℓ) n → Vec (Path #x) n → Stmt #f (plus n #x) #ℓ → Stmt #f #x #ℓ
 conv-helper [] [] s = s
 conv-helper {S n} (τ ∷ τs) (p ∷ ps) s = conv-helper τs ps (push τ ((var fZ ⇐ use (↑-var-p′′′ (S n) 0 p)) seq s))
@@ -106,18 +131,22 @@ test-conv-2 : conv {_} {_} {0} 1 ([ & (val (fin 0)) imm int ]) ([ var {10} (fin 
             ≡ region (push (& (val (fin 0)) imm int) ((var fZ ⇐ use (var (fin 4))) seq skip))
 test-conv-2 = refl
 
+-- Typing for statements.
 data stok {#f} (F : Vec (Func #f) #f) : (#x #ℓ : ℕ) → Vec (Type #ℓ) #x → Vec (Shape #ℓ) #x
                                       → Stmt #f #x #ℓ → Vec (Shape #ℓ) #x → Set
 
+-- Typing for functions.
 record fnok {#f} (F : Vec (Func #f) #f) (func : Func #f) : Set where
   constructor fn
   field
     {Δ} : Vec (Shape 1) _
+    -- The body is a well-typed statement when the arguments are in scope (initialized)
     body-ok : stok F _ 1
                    (rev (args func))
                    (rev (map init-t (args func)))
                    (body func)
                    Δ --(rev {!!})
+    -- The body cleans up after itself (freeing any heap memory it was responsible for)
     cleans-up : All (λ x → fst x ⊢ snd x Dropped) (zip (rev (args func)) Δ)
                    --(rev (map dropped-t (args func)))
 -- record fnok {#f} (F : Vec (Func #f) #f) (func : Func #f) : Set where
@@ -130,62 +159,90 @@ record fnok {#f} (F : Vec (Func #f) #f) (func : Func #f) : Set where
 --                     (range′ (#args func)) 
 
 data stok {#f} (F : Vec (Func #f) #f) where
+  -- Skip changes nothing
   skip : ∀ {#x #ℓ Γ Δ} → stok F #x #ℓ Γ Δ skip Δ
+  -- Seq threads Shape data through the statements
   _seq_ : ∀ {#x #ℓ Γ Δ₀ Δ₁ Δ₂ s₁ s₂}
         → stok F #x #ℓ Γ Δ₀ s₁ Δ₁
         → stok F #x #ℓ Γ Δ₁ s₂ Δ₂
         → stok F #x #ℓ Γ Δ₀ (s₁ seq s₂) Δ₂ 
+  -- Push ensures that the wrapped statement
   push : ∀ {#x #ℓ Γ Δ τ s δ′ Δ′}
+       -- is well typed when the context is extended
        → stok F (S #x) #ℓ (τ ∷ Γ) (void-t τ ∷ Δ) s (δ′ ∷ Δ′)
+       -- cleans up after itself if necessary
        → S #x ∣ τ ∷ Γ , δ′ ∷ Δ′ ⊢ var fZ dropped
        → stok F #x #ℓ Γ Δ (push τ s) Δ′
+  -- Pop is just a flag to the evalutator
   pop : ∀ {#x #ℓ Γ Δ s Δ′}
          → stok F (S #x) #ℓ Γ Δ s Δ′
          → stok F (S #x) #ℓ Γ Δ (pop s) Δ′
+  -- Region ensures that the wrapped statement
   region : ∀ {#x #ℓ Γ Δ s Δ′ ↓Δ′}
+         -- is well typed when the lifetime relation is extended
          → stok F #x (S #ℓ) (map (↑-#ℓ-t 1 0) Γ) (map (↑-#ℓ-sh 1 0) Δ) s Δ′
+         -- provides output Shape data that can be downshifted
          → ↓1-#ℓ-shs 0 Δ′ ↓Δ′
          → stok F #x #ℓ Γ Δ (region s) ↓Δ′
+  -- Unregion is just a flag tot he evalutator
   unregion : ∀ {#x #ℓ Γ Δ₀ s Δ₁}
            → stok F #x (S #ℓ) Γ Δ₀ s Δ₁
            → stok F #x (S #ℓ) Γ Δ₀ (unregion s) Δ₁
+  -- Assignment is ok if
   ⇐ok : ∀ {#x #ℓ Γ Δ₀ p e τᵣ τₗ Δ₁ Δ₂}
+      -- the RHS is well typed
       → Γ , Δ₀ ⊢ e ∶ τᵣ , Δ₁ expr
+      -- the LHS can be initialized once we've used the RHS
       → Δ₁ ⊢ p can-init
+      -- the LHS is well typed
       → Γ ⊢ p ∶ τₗ
+      -- the RHS is a subtype of the LHS
       → τᵣ <: τₗ
+      -- the LHS can be marked initialized in the output
       → Γ , Δ₁ ⊢ p ⇒ Δ₂ init
       → stok F #x #ℓ Γ Δ₀ (p ⇐ e) Δ₂
+  -- Free is ok if
   free : ∀ {#x #ℓ Γ Δ₀ p τ Δ₁}
+       -- The argument is a unique pointer
        → Γ ⊢ p ∶ ~ τ
+       -- With cleaned up contents
        → #x ∣ Γ , Δ₀ ⊢ * p dropped
+       -- So we mark it as deinitialized in the output
        → Γ , Δ₀ ⊢ p ⇒ Δ₁ deinit
        → stok F #x #ℓ Γ Δ₀ (free p) Δ₁
+  -- Calling a function is ok if
   call : ∀ {#x #ℓ Γ Δ₀ Δ₁ f τs} {ps : Vec (Path #x) (#args (F ! f))}
+       -- the function is well formed
        → fnok F (F ! f)
+       -- we can safely use the arguments
        → Γ , Δ₀ ⊢ ps ∶ τs , Δ₁ use-many
+       -- and formal parameter types are subtypes of the argument types
        → All (λ { (f , p) → f <: p })
              (zip (map (↑-#ℓ-t′ #ℓ 0) (args (F ! f)))
                   (map (↑-#ℓ-t 1 0) τs))
        → stok F #x #ℓ Γ Δ₀ (call f ps) Δ₁
+  -- Matching by value is ok if
   matchbyval : ∀ {#x #ℓ Γ Δ₀ p sₛ sₙ τ Δ₁ Δ₂} -- δ}
-             -- path safe to use
+             -- path safe to use (and is an option)
              → Γ , Δ₀ ⊢ p ∶ opt τ , Δ₁ use
-             -- arms of match are ok
+             ---- arms of match are ok
+             -- Some:
+             -- there is a shape
              → (δ : Shape #ℓ)
+             -- that's cleaned up
              → τ ⊢ δ Dropped
+             -- which can be left over after evalutating the block
              → stok F (S #x) (S #ℓ)
                     (map (↑-#ℓ-t 1 0) (τ ∷ Γ))
                     (map (↑-#ℓ-sh 1 0) ((init-t τ) ∷ Δ₁))
                     sₛ
                     (map (↑-#ℓ-sh 1 0) (δ ∷ Δ₂))
-                    --(map (↑-#ℓ-sh 1 0) (dropped-t τ ∷ Δ₂))
+             -- None:
+             -- the body is ok
              → stok F #x #ℓ Γ Δ₁ sₙ Δ₂
-             -- the some branch cleaned up after itself
-             --→ S #x ∣ τ ∷ Γ , δ ∷ Δ₂ ⊢ var fZ dropped
              ---- the arms are consistent
-             -- TODO loans
-             -- anything dropped on either side is dropped on both sides
+             -- note that we required the none arm and the some arm to share Δ₂
+             -- so they have the same init/loan info
              → stok F #x #ℓ Γ Δ₀ (matchbyval p sₛ sₙ) Δ₂
 
 test-stok-1 : stok [] 0 0 [] [] (push int skip) []
@@ -246,62 +303,96 @@ test-fnok-2 (fn skip (() ∷ []))
 -- test-fnok-2 (fn skip (dropped-Δ (var ()) ∷ []))
 -- test-fnok-2 (fn skip (dropped-copy var () ∷ []))
 
+-- Statement evalutation can change the number of variables, allocations, or the lifetime relation
 data stev {#f} (F : Vec (Func #f) #f) : (#x₁ #a₁ #ℓ₁ : ℕ) → Vec (Type #ℓ₁) #x₁ → Vec (Fin #a₁) #x₁
                → Vec (Layout #a₁) #a₁ → Stmt #f #x₁ #ℓ₁ 
                → (#x₂ #a₂ #ℓ₂ : ℕ) → Vec (Type #ℓ₂) #x₂ → Vec (Fin #a₂) #x₂
                → Vec (Layout #a₂) #a₂ → Stmt #f #x₂ #ℓ₂ → Set where
+  -- if the LHS of a seq finishes, then proceed to the RHS
   skipseq : ∀ {#x #a #ℓ T V H s} → stev F #x #a #ℓ T V H (skip seq s) #x #a #ℓ T V H s
+  -- if the LHS of a seq can step, then step it
   stepseq : ∀ {#x #ℓ #a₁ T V₁ H₁ s₁ #a₂ V₂ H₂ s₁′ s₂}
           → stev F #x #a₁ #ℓ T V₁ H₁ s₁ #x #a₂ #ℓ T V₂ H₂ s₁′
           → stev F #x #a₁ #ℓ T V₁ H₁ (s₁ seq s₂) #x #a₂ #ℓ T V₂ H₂ (s₁′ seq s₂)
+  -- to push a new stack variable
   push : ∀ {#x #a #ℓ T V H τ s l}
+       -- determine an uninitialized layout
        → layoutof τ l
        → stev F #x #a #ℓ T V H (push τ s)
+         -- extend the context with the type
          (S #x) (S #a) #ℓ (τ ∷ T)
+         -- map the new variable to the new allocation
          (fZ ∷ map (raise 1) V)
+         -- which is just the empty layout we created
          (l ∷ (map (↑-alloc-l 1 0) H))
+         -- change the push to a pop
          (pop s)
+  -- if the statement in a pop is finished
   pop-skip : ∀ {#x #a #ℓ τ T α V ↓V l H ↓H}
+              -- downshift the map
               → ↓xs 0 V ↓V
+              -- and the heap
               → ↓-#a-ls 0 H ↓H
               → stev F (S #x) (S #a) #ℓ (τ ∷ T) (α ∷ V) (l ∷ H) (pop skip) #x #a #ℓ T ↓V ↓H skip
+  -- if the statement in a pop can step, then step it
   pop-step : ∀ {#x #a #ℓ T V H s #a′ V′ H′ s′}
               → stev F (S #x) #a #ℓ T V H s (S #x) #a′ #ℓ T V′ H′ s′
               → stev F (S #x) #a #ℓ T V H (pop s) (S #x) #a′ #ℓ T V′ H′ (pop s′)
+  -- to push a new region, just upshift the type context
   region : ∀ {#x #a #ℓ T V H s}
          → stev F #x #a #ℓ T V H (region s) #x #a (S #ℓ) (map (↑-#ℓ-t 1 0) T) V H (unregion s)
+  -- if the statement in a unregion is down, then downshift the context
   unregion-skip : ∀ {#x #a #ℓ T V H ↓T}
                 → ↓1-#ℓ-ts 0 T ↓T
                 → stev F #x #a (S #ℓ) T V H (unregion skip) #x #a #ℓ ↓T V H skip
+  -- if the statement in an unregion can step, then step it
   unregion-step : ∀ {#x #a #ℓ T V H s #a′ V′ H′ s′}
                 → stev F #x #a (S #ℓ) T V H s #x #a′ (S #ℓ) T V′ H′ s′
                 → stev F #x #a (S #ℓ) T V H (unregion s) #x #a′ (S #ℓ) T V′ H′ (unregion s′)
+  -- assign an expression to a path by
   ⇐ev : ∀ {#x #a #ℓ T V Hᵢ Hₒ p e α}
+      -- finding where the path points to
       → T , V , Hᵢ ⊢ p ⟶ α
+      -- and using it as the destination for evaluating the expression
       → #a ∣ T , V , Hᵢ ⊢ α ← e ⟶ #a ∣ Hₒ
       → stev F #x #a #ℓ T V Hᵢ (p ⇐ e) #x #a #ℓ T V Hₒ skip
+  -- similar, but the new expression increments the allocation count, so we need to shift some things
   ⇐ev-new : ∀ {#x #a #ℓ T V Hᵢ Hₒ p e α}
           → T , V , Hᵢ ⊢ p ⟶ α
           → #a ∣ T , V , Hᵢ ⊢ α ← e ⟶ S #a ∣ Hₒ
           → stev F #x #a #ℓ T V Hᵢ (p ⇐ e) #x (S #a) #ℓ T (map (raise 1) V) Hₒ skip
+  -- free heap memory by
   free : ∀ {#x #a #ℓ T V H p α α′ H′ H′′}
+       -- finding where the path goes
        → T , map (↑-fin 1 (asℕ α′)) V , H ⊢ p ⟶ α
+       -- finding which allocation it points to
        → H ⊢ α ⇒ ptr (val (alloc α′))
+       -- set it to void
        → H ⊢ α ≔ ptr void ⇒ H′
+       -- remove the pointed-to allocation from the heap
        → remove-elem H′ α′ (map (↑-alloc-l 1 (asℕ α′)) H′′)
        → stev F #x (S #a) #ℓ T (map (↑-fin 1 (asℕ α′)) V) H (free p) #x #a #ℓ T V H′′ skip
+  -- call a function by replacing the call with the expanded body
   call : ∀ {#x #a #ℓ T V H f} {ps : Vec (Path #x) (#args (F ! f))}
        → stev F #x #a #ℓ T V H (call f ps)
                 #x #a #ℓ T V H (conv #ℓ (args (F ! f)) ps (body (F ! f)))
+  -- match on a none by value by
   matchnonebyval : ∀ {#x #a #ℓ T V H p sₛ sₙ α l}
+                 -- finding out where the path goes
                  → T , V , H ⊢ p ⟶ α
-                 -- none occupies p
+                 -- ensuring a none occupies p
                  → H ⊢ α ⇒ rec ([ int (val 0) ,, l ])
+                 -- and then going to the none statement
                  → stev F #x #a #ℓ T V H (matchbyval p sₛ sₙ) #x #a #ℓ T V H sₙ
+  -- match on a some by value by
   matchsomebyval : ∀ {#x #a #ℓ T V H p sₛ sₙ α l τ}
+                 -- ensuring the path points to an option
                  → T ⊢ p ∶ opt τ
+                 -- finding out where it points
                  → T , V , H ⊢ p ⟶ α
+                 -- ensuring a some occupies that spot
                  → H ⊢ α ⇒ rec ([ int (val 1) ,, l ])
+                 -- pushing the contents onto the stack and executing the some statement
                  → stev F #x #a #ℓ T V H (matchbyval p sₛ sₙ)
                           (S #x) (S #a) (S #ℓ)
                           (map (↑-#ℓ-t 1 0) (τ ∷ T))
