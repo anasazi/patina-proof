@@ -61,6 +61,10 @@ data Shape (#ℓ : ℕ) : Set where
   opt : Hole ⊤ #ℓ → Shape #ℓ
 -- --  struct : ∀ {n} → Vec (Shape #x) n → Shape #x
 
+-- A state is a vector of shapes (variables -> shapes)
+State : ℕ → ℕ → Set
+State #ℓ #x = Vec (Shape #ℓ) #x
+
 -- up and downshift for Holes containing a Shape
 ↑-#ℓ-sh : ∀ {#ℓ} → (d : ℕ) → ℕ → Shape #ℓ → Shape (plus d #ℓ)
 

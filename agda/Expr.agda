@@ -53,8 +53,8 @@ data Expr : (#x #ℓ : ℕ) → Set where
 -}
 
 -- Typing for Expressions
-data _,_⊢_∶_,_expr {#x #ℓ} : Vec (Type #ℓ) #x → Vec (Shape #ℓ) #x → Expr #x #ℓ
-                         → Type #ℓ → Vec (Shape #ℓ) #x → Set where
+data _,_⊢_∶_,_expr {#x #ℓ} : Context #ℓ #x → State #ℓ #x → Expr #x #ℓ
+                           → Type #ℓ → State #ℓ #x → Set where
   int : ∀ {Γ Δ n} → Γ , Δ ⊢ int n ∶ int , Δ expr
   add : ∀ {Γ Δ₀ p₁ Δ₁ p₂ Δ₂}
       → Γ , Δ₀ ⊢ p₁ ∶ int , Δ₁ use
@@ -107,15 +107,9 @@ test-rvok-5 = new (copy var int (can-access (int (init (bank [] free) tt) , (var
 
 -- Evalutation for Exprs
 -- Assigns the result to a provided Route
-data _∣_,_,_⊢_←_⟶_∣_ {#x #ℓ} : (#aᵢ : ℕ)
-                       → Vec (Type #ℓ) #x
-                       → Vec (Fin #aᵢ) #x
-                       → Vec (Layout #aᵢ) #aᵢ
-                       → Route #aᵢ
-                       → Expr #x #ℓ
-                       → (#aₒ : ℕ)
-                       → Vec (Layout #aₒ) #aₒ
-                       → Set where
+data _∣_,_,_⊢_←_⟶_∣_ {#x #ℓ} : (#aᵢ : ℕ) → Context #ℓ #x → Map #aᵢ #x → Heap #aᵢ
+                              → Route #aᵢ → Expr #x #ℓ
+                              → (#aₒ : ℕ) → Heap #aₒ → Set where
   int : ∀ {#a T V H αᵣ n H′}
       → H ⊢ αᵣ ≔ int (val n) ⇒ H′
       → #a ∣ T , V , H ⊢ αᵣ ← int n ⟶ #a ∣ H′

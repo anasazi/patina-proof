@@ -21,6 +21,10 @@ EqType : Eq Type
 EqType = record { _==_ = _=type=_ }
 -}
 
+-- A context is a vector of types (variables -> types)
+Context : ℕ → ℕ → Set
+Context #ℓ #x = Vec (Type #ℓ) #x
+
 -- Upshift the #ℓ index by d with a cutoff of c
 ↑-#ℓ-t : ∀ {#ℓ} → (d : ℕ) → ℕ → Type #ℓ → Type (plus d #ℓ)
 ↑-#ℓ-t d c int = int
@@ -60,7 +64,8 @@ data ↓1-#ℓ-t {#ℓ} : ℕ → Type (S #ℓ) → Type #ℓ → Set where
     → ↓1-#ℓ-t c (& (val ℓ) μ τ) (& (val ℓ′) μ τ′)
   opt : ∀ {c τ τ′} → ↓1-#ℓ-t c τ τ′ → ↓1-#ℓ-t c (opt τ) (opt τ′)
 
-data ↓1-#ℓ-ts {#ℓ} : ∀ {n} → ℕ → Vec (Type (S #ℓ)) n → Vec (Type #ℓ) n → Set where
+--data ↓1-#ℓ-ts {#ℓ} : ∀ {n} → ℕ → Vec (Type (S #ℓ)) n → Vec (Type #ℓ) n → Set where
+data ↓1-#ℓ-ts {#ℓ} : ∀ {n} → ℕ → Context (S #ℓ) n → Context #ℓ n → Set where
   [] : ∀ {c} → ↓1-#ℓ-ts c [] []
   _∷_ : ∀ {n c τ τ′ τs} {τs′ : Vec (Type #ℓ) n}
       → ↓1-#ℓ-t c τ τ′
@@ -103,12 +108,6 @@ test-subtype-5 : opt (& {3} (val (fin 2)) mut int) <: opt (& (val (fin 1)) mut i
 test-subtype-5 = opt (&mut (val-val (s<s z<s)))
 test-subtype-6 : ~ (& {3} (val (fin 2)) mut int) <: ~ (& (val (fin 1)) mut int)
 test-subtype-6 = ~ (&mut (val-val (s<s z<s)))
-
-  {-
-data sizeof : Type → ℕ → Set where
-  int : sizeof int 1
-  opt : ∀ {τ n} → sizeof τ n → sizeof (opt τ) (S n)
-  -}
 
 -- Predicate for implicitly copyable types
 data _Copy {#ℓ} : Type #ℓ → Set where

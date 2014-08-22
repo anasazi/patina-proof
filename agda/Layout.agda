@@ -67,7 +67,10 @@ data layoutof {#a #ℓ} :  Type #ℓ → Layout #a → Set where
 
 -- A heap is simply a vector of layouts
 Heap : ℕ → Set
-Heap n = Vec (Layout n) n
+Heap #a = Vec (Layout #a) #a
+-- A map is simply a vectory of indexes into the heap
+Map : ℕ → ℕ → Set
+Map #a #x = Vec (Fin #a) #x
 
 -- Reading memory (given a heap and a route [address], produce a layout [value])
 -- Note that this makes block reading very easy

@@ -61,7 +61,7 @@ test-↑-2 = refl
 ↑-var-p′′′ {#x} d c p rewrite plus-comm d #x = ↑-var-p′′ d c p
 
 -- Typing for Paths. Given a mapping from variables to types (i.e. a Vector of Types #x long).
-data _⊢_∶_ {#x #ℓ} : Vec (Type #ℓ) #x → Path #x → Type #ℓ → Set where
+data _⊢_∶_ {#x #ℓ} : Context #ℓ #x → Path #x → Type #ℓ → Set where
   var : ∀ {Γ x} → Γ ⊢ var x ∶ (Γ ! x)
   *~ : ∀ {Γ p τ} → Γ ⊢ p ∶ ~ τ → Γ ⊢ * p ∶ τ
   *& : ∀ {Γ p ℓ μ τ} → Γ ⊢ p ∶ & ℓ μ τ → Γ ⊢ * p ∶ τ
@@ -72,12 +72,7 @@ test-lvtype-2 : ([ int {0} ,, int ]) ⊢ var (fin 1) ∶ int
 test-lvtype-2 = var
 
 -- Evaluation for Paths. Determines a Route into corresponding to the Path.
-data _,_,_⊢_⟶_ {#x #a #ℓ} : Vec (Type #ℓ) #x
-                        → Vec (Fin #a) #x
-                        → Vec (Layout #a) #a
-                        → Path #x
-                        → Route #a
-                        → Set where
+data _,_,_⊢_⟶_ {#x #a #ℓ} : Context #ℓ #x → Map #a #x → Heap #a → Path #x → Route #a → Set where
   var : ∀ {T V H x} → T , V , H ⊢ var x ⟶ alloc (V ! x)
   * : ∀ {T V H p r} → T , V , H ⊢ p ⟶ r → T , V , H ⊢ * p ⟶ * r
 
@@ -88,13 +83,13 @@ test-lvaddr-1 : ([ int {0} ,, int ])
 test-lvaddr-1 = var
 
 -- Examining the Shape information for a Path. Requires the prefix of the path be shallowly initialized.
-data _⊢_∶_shape {#x #ℓ} (Δ : Vec (Shape #ℓ) #x) : Path #x → Shape #ℓ → Set where
+data _⊢_∶_shape {#x #ℓ} (Δ : State #ℓ #x) : Path #x → Shape #ℓ → Set where
   var : ∀ {x} → Δ ⊢ var x ∶ Δ ! x shape
   *~ : ∀ {p B δ} → Δ ⊢ p ∶ ~ (init B δ) shape → Δ ⊢ * p ∶ δ shape
   *& : ∀ {p B τ} → Δ ⊢ p ∶ & (init B τ) shape → Δ ⊢ * p ∶ init-t τ shape
 
 -- A Path is deeply initialized if it has a Full shape.
-_⊢_deep : ∀ {#x #ℓ} → Vec (Shape #ℓ) #x → Path #x → Set
+_⊢_deep : ∀ {#x #ℓ} → State #ℓ #x → Path #x → Set
 Δ ⊢ p deep = Σ[ δ ∈ Shape _ ] Δ ⊢ p ∶ δ shape × δ Full
 
 test-deep-1 : ([ int {0} (init (bank-def _) tt) ]) ⊢ var fZ deep
@@ -103,7 +98,7 @@ test-deep-2 : ¬ (([ int {0} void ]) ⊢ var fZ deep)
 test-deep-2 (.(int void) , (var , ()))
 
 -- Setting the Shape information for a Path. Will initialize a prefix of the Path.
-data _⊢_≔_⇒_shape {#x #ℓ} : Vec (Shape #ℓ) #x → Path #x → Shape #ℓ → Vec (Shape #ℓ) #x → Set where
+data _⊢_≔_⇒_shape {#x #ℓ} : State #ℓ #x → Path #x → Shape #ℓ → State #ℓ #x → Set where
   var : ∀ {Δ x δ} → Δ ⊢ var x ≔ δ ⇒ set Δ x δ shape
   * : ∀ {Δ p B δ δ′ Δ′}
     → Δ ⊢ p ∶ ~ δ′ shape
@@ -112,7 +107,7 @@ data _⊢_≔_⇒_shape {#x #ℓ} : Vec (Shape #ℓ) #x → Path #x → Shape #�
   -- We do not need a version that goes through & pointers because & shapes do not contain shapes
 
 -- Initialize a Path (set it's Shape to be the fully initialized Shape for its Type)
-_,_⊢_⇒_init : ∀ {#x #ℓ} → Vec (Type #ℓ) #x → Vec (Shape #ℓ) #x → Path #x → Vec (Shape #ℓ) #x → Set
+_,_⊢_⇒_init : ∀ {#x #ℓ} → Context #ℓ #x → State #ℓ #x → Path #x → State #ℓ #x → Set
 Γ , Δ ⊢ p ⇒ Δ′ init = Σ[ τ ∈ Type _ ] Γ ⊢ p ∶ τ × (Δ ⊢ p ≔ init-t τ ⇒ Δ′ shape)
 
 test-init-1 : ([ int {0} ])
@@ -132,7 +127,7 @@ test-init-3 : ([ ~ {0} int ])
 test-init-3 = int , (*~ var , * var var)
 
 -- Deinitialize a Path (set it's Shape to be the fully uninitlaized Shape for its Type)
-_,_⊢_⇒_deinit : ∀ {#x #ℓ} → Vec (Type #ℓ) #x → Vec (Shape #ℓ) #x → Path #x → Vec (Shape #ℓ) #x → Set
+_,_⊢_⇒_deinit : ∀ {#x #ℓ} → Context #ℓ #x → State #ℓ #x → Path #x → State #ℓ #x → Set
 Γ , Δ ⊢ p ⇒ Δ′ deinit = Σ[ τ ∈ Type _ ] Γ ⊢ p ∶ τ × (Δ ⊢ p ≔ void-t τ ⇒ Δ′ shape)
 
 test-deinit-1 : ([ int {0} ])
@@ -151,13 +146,14 @@ test-deinit-3 : ([ ~ {0} int ])
               ⇒ [ ~ (init (bank-def _) (int void)) ] deinit
 test-deinit-3 = int , (*~ var , * var var)
 
--- We can initialize a Path if the prefix of the path is initialized and the Shape of the Path is full uninitialized.
-_⊢_can-init : ∀ {#x #ℓ} → Vec (Shape #ℓ) #x → Path #x → Set
+-- We can initialize a Path if the prefix of the path is initialized
+-- and the Shape of the Path is full uninitialized.
+_⊢_can-init : ∀ {#x #ℓ} → State #ℓ #x → Path #x → Set
 Δ ⊢ p can-init = Σ[ δ ∈ Shape _ ] Δ ⊢ p ∶ δ shape × δ Empty
 
 -- Judgment for accessing a Path
-record _,_⊢_access {#x #ℓ} (Γ : Vec (Type #ℓ) #x)
-                        (Δ : Vec (Shape #ℓ) #x)
+record _,_⊢_access {#x #ℓ} (Γ : Context #ℓ #x)
+                        (Δ : State #ℓ #x)
                         (p : Path #x) : Set where
   constructor can-access
   field
@@ -166,15 +162,15 @@ record _,_⊢_access {#x #ℓ} (Γ : Vec (Type #ℓ) #x)
     --unborrowed : {!!} -- TODO don't have loans yet
 
 -- Judgment for reading a Path
-_,_⊢_read : ∀ {#x #ℓ} → Vec (Type #ℓ) #x → Vec (Shape #ℓ) #x → Path #x → Set
+_,_⊢_read : ∀ {#x #ℓ} → Context #ℓ #x → State #ℓ #x → Path #x → Set
 Γ , Δ ⊢ p read = Γ , Δ ⊢ p access
 
 -- Judgment for writing a Path
-_,_⊢_write : ∀ {#x #ℓ} → Vec (Type #ℓ) #x → Vec (Shape #ℓ) #x → Path #x → Set
+_,_⊢_write : ∀ {#x #ℓ} → Context #ℓ #x → State #ℓ #x → Path #x → Set
 Γ , Δ ⊢ p write = Γ , Δ ⊢ p access
 
 -- Judgment for whether a Path owns itself
-data _⊢_owned {#x #ℓ} (Γ : Vec (Type #ℓ) #x) : Path #x → Set where
+data _⊢_owned {#x #ℓ} (Γ : Context #ℓ #x) : Path #x → Set where
   var : ∀ {x} → Γ ⊢ var x owned
   *~ : ∀ {p τ} → Γ ⊢ p ∶ ~ τ → Γ ⊢ * p owned
 
@@ -184,16 +180,11 @@ test-owned-2 : ([ ~ {0} int ]) ⊢ * (var fZ) owned
 test-owned-2 = *~ var
 
 -- Judgment for moving a Path
-_,_⊢_move : ∀ {#x #ℓ} → Vec (Type #ℓ) #x → Vec (Shape #ℓ) #x → Path #x → Set
+_,_⊢_move : ∀ {#x #ℓ} → Context #ℓ #x → State #ℓ #x → Path #x → Set
 Γ , Δ ⊢ p move = Γ ⊢ p owned × Γ , Δ ⊢ p write
 
 -- Judgment for whether it is ok to use a Path
-data _,_⊢_∶_,_use {#x #ℓ} : Vec (Type #ℓ) #x
-                     → Vec (Shape #ℓ) #x
-                     → Path #x
-                     → Type #ℓ
-                     → Vec (Shape #ℓ) #x
-                     → Set where
+data _,_⊢_∶_,_use {#x #ℓ} : Context #ℓ #x → State #ℓ #x → Path #x → Type #ℓ → State #ℓ #x → Set where
   -- Copyable types do not change initialization state
   copy : ∀ {Γ Δ p τ}
        → Γ ⊢ p ∶ τ
@@ -209,8 +200,8 @@ data _,_⊢_∶_,_use {#x #ℓ} : Vec (Type #ℓ) #x
        → Γ , Δ ⊢ p ∶ τ , Δ′ use
 
 -- Iterated use of Paths
-data _,_⊢_∶_,_use-many {#x #ℓ} : ∀ {n} → Vec (Type #ℓ) #x → Vec (Shape #ℓ) #x
-                            → Vec (Path #x) n → Vec (Type #ℓ) n → Vec (Shape #ℓ) #x → Set where
+data _,_⊢_∶_,_use-many {#x #ℓ} : ∀ {n} → Context #ℓ #x → State #ℓ #x → Vec (Path #x) n
+                               → Vec (Type #ℓ) n → State #ℓ #x → Set where
    [] : ∀ {Γ Δ} → Γ , Δ ⊢ [] ∶ [] , Δ use-many
    _∷_ : ∀ {Γ Δ₀ Δ₁ Δ₂ p τ n} {ps : Vec (Path #x) n} {τs : Vec (Type #ℓ) n}
        → Γ , Δ₀ ⊢ p ∶ τ , Δ₁ use
@@ -219,13 +210,13 @@ data _,_⊢_∶_,_use-many {#x #ℓ} : ∀ {n} → Vec (Type #ℓ) #x → Vec (S
 
 -- Checking whether a Path is uninitialized
 -- (potentially has an uninitialized prefix, which makes getting the Shape impossible)
-data _⊢_uninit {#x #ℓ} (Δ : Vec (Shape #ℓ) #x) : Path #x → Set where
+data _⊢_uninit {#x #ℓ} (Δ : State #ℓ #x) : Path #x → Set where
   var : ∀ {x} → (Δ ! x) Empty → Δ ⊢ var x uninit
   * : ∀ {p δ} → Δ ⊢ p ∶ δ shape → δ Empty → Δ ⊢ * p uninit
   *⊥ : ∀ {p} → Δ ⊢ p uninit → Δ ⊢ * p uninit
   
 -- Checking whether a path has been dropped if it needs to be dropped.
-data _∣_,_⊢_dropped {#ℓ} : ∀ #x → Vec (Type #ℓ) #x → Vec (Shape #ℓ) #x → Path #x → Set where
+data _∣_,_⊢_dropped {#ℓ} : ∀ #x → Context #ℓ #x → State #ℓ #x → Path #x → Set where
   dropped-Δ : ∀ {#x Γ Δ p} → Δ ⊢ p uninit → #x ∣ Γ , Δ ⊢ p dropped
   dropped-copy : ∀ {#x Γ Δ p τ} → Γ ⊢ p ∶ τ → τ ¬Drop → #x ∣ Γ , Δ ⊢ p dropped
 

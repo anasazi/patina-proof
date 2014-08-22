@@ -132,8 +132,8 @@ test-conv-2 : conv {_} {_} {0} 1 ([ & (val (fin 0)) imm int ]) ([ var {10} (fin 
 test-conv-2 = refl
 
 -- Typing for statements.
-data stok {#f} (F : Vec (Func #f) #f) : (#x #ℓ : ℕ) → Vec (Type #ℓ) #x → Vec (Shape #ℓ) #x
-                                      → Stmt #f #x #ℓ → Vec (Shape #ℓ) #x → Set
+data stok {#f} (F : Vec (Func #f) #f) : (#x #ℓ : ℕ) → Context #ℓ #x → State #ℓ #x
+                                      → Stmt #f #x #ℓ → State #ℓ #x → Set
 
 -- Typing for functions.
 record fnok {#f} (F : Vec (Func #f) #f) (func : Func #f) : Set where
@@ -288,10 +288,10 @@ test-fnok-2 : ¬ (fnok [] (fn ([ ~ int ]) skip))
 test-fnok-2 (fn skip (() ∷ []))
 
 -- Statement evalutation can change the number of variables, allocations, or the lifetime relation
-data stev {#f} (F : Vec (Func #f) #f) : (#x₁ #a₁ #ℓ₁ : ℕ) → Vec (Type #ℓ₁) #x₁ → Vec (Fin #a₁) #x₁
-               → Vec (Layout #a₁) #a₁ → Stmt #f #x₁ #ℓ₁ 
-               → (#x₂ #a₂ #ℓ₂ : ℕ) → Vec (Type #ℓ₂) #x₂ → Vec (Fin #a₂) #x₂
-               → Vec (Layout #a₂) #a₂ → Stmt #f #x₂ #ℓ₂ → Set where
+data stev {#f} (F : Vec (Func #f) #f) : (#x₁ #a₁ #ℓ₁ : ℕ) → Context #ℓ₁ #x₁ → Map #a₁ #x₁
+                                      → Heap #a₁ → Stmt #f #x₁ #ℓ₁
+                                      → (#x₂ #a₂ #ℓ₂ : ℕ) → Context #ℓ₂ #x₂ → Map #a₂ #x₂
+                                      → Heap #a₂ → Stmt #f #x₂ #ℓ₂ → Set where
   -- if the LHS of a seq finishes, then proceed to the RHS
   skipseq : ∀ {#x #a #ℓ T V H s} → stev F #x #a #ℓ T V H (skip seq s) #x #a #ℓ T V H s
   -- if the LHS of a seq can step, then step it
