@@ -45,6 +45,21 @@ data Life (#ℓ : ℕ) : Set where
   -- A lifetime value is identified by some element of the finite set of size #ℓ
   val : Fin #ℓ → Life #ℓ
 
+private
+  val-inj : ∀ {#ℓ} {i j : Fin #ℓ} → val i ≡ val j → i ≡ j
+  val-inj refl = refl
+
+  _=life=_ : ∀ {#ℓ} → (ℓ₁ ℓ₂ : Life #ℓ) → Dec (ℓ₁ ≡ ℓ₂)
+  static =life= static = yes refl
+  static =life= val ℓ₂ = no (λ ())
+  val ℓ₁ =life= static = no (λ ())
+  val ℓ₁ =life= val ℓ₂ with ℓ₁ == ℓ₂
+  val ℓ₁ =life= val .ℓ₁ | yes refl = yes refl
+  val ℓ₁ =life= val ℓ₂ | no neq = no (neq ∘ val-inj)
+
+EqLife : ∀ {#ℓ} → Eq (Life #ℓ)
+EqLife = record { _==_ = _=life=_ }
+
 -- The ordering relationship on lifetimes.
 data _∣_<:_ (#ℓ : ℕ) : Life #ℓ → Life #ℓ → Set where
   -- The relationship is reflexive for all three constructors
