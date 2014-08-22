@@ -113,6 +113,25 @@ data _⊢_∶_layout {#a #ℓ} (σ : Vec (Type #ℓ) #a) : Layout #a → Type #�
 --      → All (λ {(l , τ) → σ ⊢ l ∶ τ layout}) (zip ls τs)
 --      → σ ⊢ rec ls ∶ rec τs layout
 
+_⊢_heap : ∀ {#ℓ #a} → Context #ℓ #a → Heap #a → Set
+σ ⊢ H heap = All2 (λ τ l → σ ⊢ l ∶ τ layout) σ H
+
 -- Consistency of heap types
 _,_⊢_heap-type : ∀ {#ℓ #x #a} → Context #ℓ #x → Map #a #x → Context #ℓ #a → Set
 Γ , V ⊢ σ heap-type = All2 (λ τ α → τ ≡ σ ! α) Γ V
+
+-- Reading preserves types
+reading-preserves-types : ∀ {#ℓ #a H r τ l} {σ : Context #ℓ #a}
+                        → σ ⊢ H heap
+                        → σ ⊢ r ∶ τ route
+                        → H ⊢ r ⇒ l
+                        → σ ⊢ l ∶ τ layout
+reading-preserves-types σ⊢H (alloc {α}) alloc = σ⊢H All2! α
+reading-preserves-types σ⊢H (*~ r∶~τ) (* r⇒r′ r′⇒l) with reading-preserves-types σ⊢H r∶~τ r⇒r′
+... | ptr~ r′∶τ = reading-preserves-types σ⊢H r′∶τ r′⇒l
+reading-preserves-types σ⊢H (*& r∶&τ) (* r⇒r′ r′⇒l) with reading-preserves-types σ⊢H r∶&τ r⇒r′
+... | ptr& r′∶τ = reading-preserves-types σ⊢H r′∶τ r′⇒l
+reading-preserves-types σ⊢H (disc r∶τ) (∙ r⇒l) with reading-preserves-types σ⊢H r∶τ r⇒l
+... | opt ∙0∶int ∙1∶τ = ∙0∶int
+reading-preserves-types σ⊢H (pay r∶τ) (∙ r⇒l) with reading-preserves-types σ⊢H r∶τ r⇒l
+... | opt ∙0∶int ∙1∶τ = ∙1∶τ
