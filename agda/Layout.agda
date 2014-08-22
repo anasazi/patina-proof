@@ -135,3 +135,24 @@ reading-preserves-types σ⊢H (disc r∶τ) (∙ r⇒l) with reading-preserves-
 ... | opt ∙0∶int ∙1∶τ = ∙0∶int
 reading-preserves-types σ⊢H (pay r∶τ) (∙ r⇒l) with reading-preserves-types σ⊢H r∶τ r⇒l
 ... | opt ∙0∶int ∙1∶τ = ∙1∶τ
+
+open import Shape
+
+-- Correspondence between a Shape and a Layout
+data _⊢_∶_rep {#ℓ #a} : Heap #a → Layout #a → Shape #ℓ → Set where
+  int⊥ : ∀ {H} → H ⊢ int void ∶ int void rep
+  int : ∀ {H n B} → H ⊢ int (val n) ∶ int (init B tt) rep
+  ~⊥ : ∀ {H} → H ⊢ ptr void ∶ ~ void rep
+  ~ : ∀ {H B r δ l} → H ⊢ r ⇒ l → H ⊢ l ∶ δ rep → H ⊢ ptr (val r) ∶ ~ (init B δ) rep
+  &⊥ : ∀ {H} → H ⊢ ptr void ∶ & void rep
+  & : ∀ {H B r τ l} → H ⊢ r ⇒ l → H ⊢ l ∶ init-t τ rep → H ⊢ ptr (val r) ∶ & (init B τ) rep
+  opt⊥ : ∀ {H l} {τ : Type #ℓ}
+       → H ⊢ l ∶ void-t τ rep → H ⊢ rec ([ int void ,, l ]) ∶ opt void rep
+  none : ∀ {H B l} {τ : Type #ℓ}
+       → H ⊢ l ∶ void-t τ rep → H ⊢ rec ([ int (val 0) ,, l ]) ∶ opt (init B tt) rep
+  some : ∀ {H B l} {τ : Type #ℓ}
+       → H ⊢ l ∶ init-t τ rep → H ⊢ rec ([ int (val 1) ,, l ]) ∶ opt (init B tt) rep
+
+-- Initialization of the heap
+_,_⊢_heap-state : ∀ {#ℓ #x #a} → State #ℓ #x → Map #a #x → Heap #a → Set
+Δ , V ⊢ H heap-state = All2 (λ δ α → H ⊢ H ! α ∶ δ rep) Δ V
