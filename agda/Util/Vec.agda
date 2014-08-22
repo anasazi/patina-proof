@@ -27,6 +27,10 @@ data All {A} (P : A → Set) : ∀ {n} → Vec A n → Set where
   []  : All P []
   _∷_ : ∀ {n x} {xs : Vec A n} → P x → All P xs → All P (x ∷ xs)
 
+data All2 {A B} (P : A → B → Set) : ∀ {n} → Vec A n → Vec B n → Set where
+  [] : All2 P [] []
+  _∷_ : ∀ {n x y xs ys} → P x y → All2 P {n} xs ys → All2 P (x ∷ xs) (y ∷ ys)
+
 data Any {A : Set} (P : A → Set) : ∀ {n} → Vec A n → Set where
   Z : ∀ {n x} {xs : Vec A n} → P x → Any P (x ∷ xs)
   S : ∀ {n x} {xs : Vec A n} → Any P xs → Any P (x ∷ xs)
@@ -35,6 +39,10 @@ infixl 8 _!_
 _!_ : ∀ {A n} → Vec A n → Fin n → A
 (x ∷ xs) ! fZ = x
 (x ∷ xs) ! fS i = xs ! i
+
+_All2!_ : ∀ {A B n P xs ys} → All2 {A} {B} P {n} xs ys → (i : Fin n) → P (xs ! i) (ys ! i)
+(p ∷ ps) All2! fZ = p
+(p ∷ ps) All2! fS i = ps All2! i
 
 set : ∀ {A n} → Vec A n → Fin n → A → Vec A n
 set (x ∷ xs) fZ v = v ∷ xs
