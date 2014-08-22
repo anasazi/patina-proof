@@ -3,6 +3,7 @@ open import Util.Equality
 open import Util.Decidable
 open import Util.Fin
 open import Util.Product
+open import Util.Function
 
 module Util.Vec where
 
@@ -10,6 +11,20 @@ infixr 5 _∷_
 data Vec (A : Set) : ℕ → Set where
   []  : Vec A 0
   _∷_ : ∀ {n} → A → Vec A n → Vec A (S n)
+
+private
+  ∷-inj : ∀ {A n x y xs} {ys : Vec A n} → x ∷ xs ≡ y ∷ ys → x ≡ y × xs ≡ ys
+  ∷-inj refl = refl , refl
+
+  _=vec=_ : ∀ {A n} {{EqA : Eq A}} (xs ys : Vec A n) → Dec (xs ≡ ys)
+  [] =vec= [] = yes refl
+  (x ∷ xs) =vec= (y ∷ ys) with x == y | xs =vec= ys
+  (x ∷ xs) =vec= (.x ∷ .xs) | yes refl | yes refl = yes refl
+  (x ∷ xs) =vec= (y ∷ ys)   | _        | no neq   = no (neq ∘ snd ∘ ∷-inj)
+  (x ∷ xs) =vec= (y ∷ ys)   | no neq   | _        = no (neq ∘ fst ∘ ∷-inj)
+
+EqVec : ∀ {A n} {{EqA : Eq A}} → Eq (Vec A n)
+EqVec = record { _==_ = _=vec=_ }
 
 infix 4 [_
 [_ : ∀ {A n} → Vec A n → Vec A n
