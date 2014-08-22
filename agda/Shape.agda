@@ -137,3 +137,23 @@ data _Empty {#ℓ} : Shape #ℓ → Set where
   -- TODO do we want to distinguish between &imm and &mut?
   & : & void Empty
   opt : opt void Empty
+
+-- Typing for shapes
+data _⊢_shape {#ℓ} : Type #ℓ → Shape #ℓ → Set where
+  int : ∀ {h} → int ⊢ int h shape
+  ~ : ∀ {B τ δ} → τ ⊢ δ shape → ~ τ ⊢ ~ (init B δ) shape
+  ~⊥ : ∀ {τ} → ~ τ ⊢ ~ void shape
+  & : ∀ {B ℓ μ τ} → & ℓ μ τ ⊢ & (init B τ) shape
+  &⊥ : ∀ {ℓ μ τ} → & ℓ μ τ ⊢ & void shape
+  opt : ∀ {h τ} → opt τ ⊢ opt h shape
+
+-- Typing for states
+_⊢_state : ∀ {#ℓ #x} → Context #ℓ #x → State #ℓ #x → Set
+Γ ⊢ Δ state = All2 (λ τ δ → τ ⊢ δ shape) Γ Δ
+
+-- The initial shape is well typed
+init-t-well-typed : ∀ {#ℓ} → (τ : Type #ℓ) → τ ⊢ init-t τ shape
+init-t-well-typed int = int
+init-t-well-typed (~ τ) = ~ (init-t-well-typed τ)
+init-t-well-typed (& ℓ μ τ) = &
+init-t-well-typed (opt τ) = opt
