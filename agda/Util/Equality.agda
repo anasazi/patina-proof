@@ -23,5 +23,5 @@ module Util.Equality where
   _~_ : ∀ {A : Set} {x y z : A} → x ≡ y → y ≡ z → x ≡ z
   refl ~ refl = refl
 
-  transport : ∀ {A : Set} (B : A → Set) {x y} → x ≡ y → B x → B y
-  transport B refl b = b
+  subst : ∀ {a b} {A : Set a} (B : A → Set b) {x y} → x ≡ y → B x → B y
+  subst B refl b = b
