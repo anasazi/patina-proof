@@ -82,15 +82,25 @@ test-lvaddr-1 : ([ int {0} ,, int ])
               ⊢ var (fin 1) ⟶ alloc (fin 0)
 test-lvaddr-1 = var
 
--- Evalutation of a well typed path produces a well type route of the same type
-eval-preserves-types : ∀ {#ℓ #x #a p τ r σ V} {Γ : Context #ℓ #x} {H : Heap #a}
-                     → Γ , V ⊢ σ heap-type
-                     → Γ ⊢ p ∶ τ
-                     → Γ , V , H ⊢ p ⟶ r
-                     → σ ⊢ r ∶ τ route
-eval-preserves-types Γ,V⊢σ (var {x}) var rewrite Γ,V⊢σ All2! x = alloc
-eval-preserves-types Γ,V⊢σ (*~ p∶τ) (* p⟶r) = *~ (eval-preserves-types Γ,V⊢σ p∶τ p⟶r)
-eval-preserves-types Γ,V⊢σ (*& p∶τ) (* p⟶r) = *& (eval-preserves-types Γ,V⊢σ p∶τ p⟶r)
+-- Under a well formed heap, a well typed path can always evaluate to a route
+path-eval-progress : ∀ {#ℓ #x #a p τ σ V} {Γ : Context #ℓ #x} {H : Heap #a}
+                   → Γ , V ⊢ σ heap-type
+                   → σ ⊢ H heap
+                   → Γ ⊢ p ∶ τ
+                   → Σ[ r ∈ Route #a ] Γ , V , H ⊢ p ⟶ r
+path-eval-progress Γ⊢σ σ⊢H var = alloc _ , var
+path-eval-progress Γ⊢σ σ⊢H (*~ p∶τ) = (* *** *) (path-eval-progress Γ⊢σ σ⊢H p∶τ)
+path-eval-progress Γ⊢σ σ⊢H (*& p∶τ) = (* *** *) (path-eval-progress Γ⊢σ σ⊢H p∶τ)
+
+-- Evaluation of a well typed path produces a well type route of the same type
+path-eval-preservation : ∀ {#ℓ #x #a p τ r σ V} {Γ : Context #ℓ #x} {H : Heap #a}
+                       → Γ , V ⊢ σ heap-type
+                       → Γ ⊢ p ∶ τ
+                       → Γ , V , H ⊢ p ⟶ r
+                       → σ ⊢ r ∶ τ route
+path-eval-preservation Γ,V⊢σ (var {x}) var rewrite Γ,V⊢σ All2! x = alloc
+path-eval-preservation Γ,V⊢σ (*~ p∶τ) (* p⟶r) = *~ (path-eval-preservation Γ,V⊢σ p∶τ p⟶r)
+path-eval-preservation Γ,V⊢σ (*& p∶τ) (* p⟶r) = *& (path-eval-preservation Γ,V⊢σ p∶τ p⟶r)
 
 -- Examining the Shape information for a Path. Requires the prefix of the path be shallowly initialized.
 data _⊢_∶_shape {#x #ℓ} (Δ : State #ℓ #x) : Path #x → Shape #ℓ → Set where
