@@ -13,3 +13,5 @@ open import Util.Nat public
 
 open import Util.Vec public
 open import Util.Fin public
+
+open import Util.Maybe public

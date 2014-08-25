@@ -55,6 +55,10 @@ _!_ : ∀ {A n} → Vec A n → Fin n → A
 (x ∷ xs) ! fZ = x
 (x ∷ xs) ! fS i = xs ! i
 
+_All!_ : ∀ {A n P xs} → All {A} P {n} xs → (i : Fin n) → P (xs ! i)
+(p ∷ ps) All! fZ = p
+(p ∷ ps) All! fS i = ps All! i
+
 _All2!_ : ∀ {A B n P xs ys} → All2 {A} {B} P {n} xs ys → (i : Fin n) → P (xs ! i) (ys ! i)
 (p ∷ ps) All2! fZ = p
 (p ∷ ps) All2! fS i = ps All2! i
