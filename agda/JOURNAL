@@ -1,0 +1,258 @@
+8-28-14
+
+First entry, so it's a very long one.
+
+In the original proposed plan, I used a datatype representing
+an index into a list for things like variables and addresses.
+This is a fairly common technique that works well when the list
+in question isn't changing (it's very much like a De Bruijn index
+and usually called such). However, it breaks down when we mutate
+the value at an address. This break down is mostly related to the
+list changing, which changes the type of addresses, which necessitates
+adjusting all other addresses to this new type, which is difficult to do.
+This seemed to imply that a nominal approach for addresses would be
+necessary regardless. I decided to recast the model back into a
+nominal form and proceed.
+
+A nominal style, as I originally expected, was workable, but added
+a lot of tedious proofs for things like "this variable exists",
+"this variable is unique", and "this address maps to this value",
+which automate rather poorly. I also noticed that many of the Patina
+model judgments are really proofs of negatives.
+For example, Patina tracked the list of deinitialized
+paths and to use a path we must prove it is not in that list.
+While this is certainly possible to do in Agda, it is not ideal.
+Like in Coq, ¬ A = A → ⊥. To prove that a path is not in the list involves
+case analysis on all possible proofs that it *is* in the list.
+Handling this sort of thing in Agda is really just a giant pain.
+I started looking at how I could undo all this negation.
+
+Around this time, I realized a drastically better representation
+for variables, address, lifetimes, struct names, etc.
+It's much more like the original De Bruijn indicies instead of the
+datatype version commonly used in Agda and Coq.
+(Frankly, I'm not sure why it took me so long to think about it.
+I think it may have just been overshadowed by the datatype version.)
+The general idea is to index types by the number of variables (or whatever).
+Then a variable is simply an elements of Fin (number of variables),
+the finite set of (number of variables) elements (alternatively, the set
+of natrual numbers less than the number of variables).
+This neatly avoids the update problem the datatype version has while
+still ensuring all identifiers are actually defined.
+The indicies I thought I would need were:
+
+#x - the number of variables
+#a - the number of addresses/values
+#s - the number of structs
+#f - the number of functions
+#ℓ - the number of lifetimes
+
+A path/lval type declaration would look:
+
+data Path : (#x : ℕ)  → Set where
+  var : ∀ {#x} → Fin #x → Path #x
+  ...
+
+So, by construction, undefined variables are impossible.
+
+There was still a need to maintain a complex relationship datatype
+for lifetimes. However, I realized I could scrap all of that by
+simply splitting lifetimes into values and variables.
+Lifetime variables are the parameters for structs and functions.
+Lifetime values are created by entering new blocks, function calls, etc.
+In structs declarations, only variables are present and they are all unrelated.
+In functions, the variables are still unrelated, but they are all longer than
+any value created inside the function body. Values have a natural total ordering.
+This results in a relationship like:
+
+var1 var2 var3 var4
+ |      |  |    |
+ -------val1-----
+	 |
+	val2
+         |
+	val3
+
+So, if we track #ℓ, the number of lifetime values, and #̷L, the number of lifetime variables,
+then we can entirely capture the lifetime relation. Ordering of values is simply ordering
+of the undering index (since these are De Bruijn indicies, the lower indicies are newer).
+All values are less than all variables. Variables are unrelated. Static is a special
+lifetime that's could either be considered of equal rank as variables or even longer than them.
+The index set is now:
+
+#x - the number of variables
+#a - the number of addresses/values
+#s - the number of structs
+#f - the number of functions
+#ℓ - the number of lifetime values
+#̷L - the number of lifetime variables
+
+Once I starting dealing with memory, one problem became apparent.
+Address arithmetic is *exceedingly* difficult to do in this setup.
+It's easy to add some offset m to an element of Fin n,
+if you want a return type of Fin (m + n), but that would ill-typed for us.
+I needed a better way to navigate through memory than addresses.
+I decided to add additional structure of memory that would eliminate the
+need for address arithmetic. The result is the Layout type.
+
+Layouts can be constructed in three ways:
+- A slot that might contain an integer
+- A slot that might contain a Route (a replace for addresses)
+- A vector of layouts (known length = easy to check safety of projections)
+
+Routes describe paths through Layouts.
+Routes are actually almost identical to Paths, but they can go into options.
+
+Memory is now a vector of Layouts with a top level Layout for every allocation.
+Thus #a switches from the number of address to the number of allocations (stack & heap).
+Paths evaluate to a Route instead of an address.
+Memory can read the Layout at a Route or write a Layout to a Route.
+Expressions produce a Layout when evaluated.
+No address arithmetic involved anywhere.
+The index set hasn't changed size, but it has changed meaning:
+
+#x - the number of variables
+#a - the number of memory allocations
+#s - the number of structs
+#f - the number of functions
+#ℓ - the number of lifetime values
+#̷L - the number of lifetime variables
+
+I mentioned the need for something better than a list of (de)initialized Paths before.
+The replacement allows us to do direct proofs of both initialization and uninitialization.
+For lack or a decent name, it's called a Shape. It feels very similar to a Layout,
+but incorporates more type information.
+
+A Shape can be constructed by:
+- A integer slot that might be initialized
+- A ~ pointer slot that might contain another Shape
+- A & pointer slot that might contain a Type
+- An option slot that might be initialized
+- A struct slot that contains a vector of other Shapes
+
+Integers and Options simply tell us whether or not they are initialized.
+& pointers *always* point to something initialized, so we only need to know
+the type of the pointed-to thing to check Paths. Structs' initialization is 
+completely dependent upon the initialization of its components.
+~ pointers that point to something else, which itself may or may not be initialized.
+This is easiest to represent via recursive shapes.
+
+This setup provides a great relationship between Paths, Shapes, Routes, and Layouts.
+
+          |
+Typecheck |    Path ---- points to a ---> Shape 
+          |     |                           |
+          |     |                           |
+----------------|---------------------------|------------------
+          |  prefixes                   represents
+          |     v                           v
+Runtime   |   Route ---- points to a ---> Layout
+          |
+	
+We can easily check shallow and deep initialization, initializability, and so on with Shapes.
+We can replace the set of deinitialized paths with a vector of Shapes for the stack variables.
+
+Tracking a list of loans also poses some problems: permutations of the list, duplicates, etc.
+I decided to incorporate loan tracking into Shapes to aid the un-negation quest.
+Each initialized node of a Shape would contain loan information for that particular Path,
+so we only need to represent the set of loans for a particular Path.
+
+We already know all of the lifetimes in existence, so we can record the loan state
+of the Path for every lifetime. Loaning for a particular lifetime is monotonic,
+i.e. unloaned -> mutable loan -> immutable loan, so we only need to track Maybe Mut
+for each lifetime. This equates to a vector for #ℓ, a vector for #̷L, and one loan for static.
+This collection of loans is called a Bank (because what else would you call it?).
+
+When we expire the loans for some region we're leaving, we simply drop the first element of
+the lifetime values vector. When we enter a new region, we prepend "unloaned" in the new slot.
+
+Checking unencumberedness involves checking that no prefix of the path is borrowed.
+Checking unrestrictedness involves checking that no subpath is borrowed in a restricting way.
+
+Checking that a path's Bank is unborrowed is just checking that every Loan in the Bank is free.
+Checking that a path's Bank is unrestricted for writing is just checking that it is unborrowed.
+Checking that a path's Bank is unrestricted for reading is checking whether the most recent
+borrow, if it exists, was an immutable one.
+
+Checking that a path is unrestricted means checking that path's Bank and recursing into subpaths.
+Checking that a path is unencumbered means checking the Banks of the prefixes.
+Both are easy to do directly in this setup.
+
+At this point I found it more convenient to separate memory into a Stack and Heap.
+The Stack is a vector of Layouts #x long. The Heap is a vector of Layouts (num heap allocs) long.
+This is mostly useful for making popping stack values easier (simply drop the prefix).
+Since #a at this point is just #x plus (number of heap allocations), I renamed the later to #a.
+Addionally, Routes can new point to either a stack slot or a heap slot.
+The index set hasn't changed size, but it has changed meaning (again):
+
+#x - the number of stack variables
+#a - the number of heap allocations
+#s - the number of structs
+#f - the number of functions
+#ℓ - the number of lifetime values
+#̷L - the number of lifetime variables
+
+Statements created an unexpected amount of trouble. 
+At first, I had merged together statements, sequences of statements, and blocks into one type.
+I replaced blocks with "push" statements, which pushed one stack variable, just because
+it was easier to deal with. "push" wrapped a statement expecting one more variable.
+That is, push had a type like: ∀ {#x} → Type → Stmt (S #x) → Stmt #x.
+Of course, I needed some way to tell when I'd already done the allocating part of the push,
+so I created the pop statement: ∀ {#x} → Stmt (S #x) → Stmt (S #x).
+When the wrapped statement in a pop finished, it would pop the variable off the stack.
+
+Turns out that this actually creates a soundness bug!
+The sequencing statement _>>_: ∀ {#x} → Stmt #x → Stmt #x → Stmt #x interacts poorly with push/pop.
+The statement (push int skip) >> (var fZ = int 1) is well typed (∀ {#x} → Stmt (S #x)).
+It evalutates to (pop skip) >> (var fZ = int 1), which has a problem.
+The LHS has type ∀ {#x} → Stmt (S (S #x)). The RHS is still ∀ {#x} → Stmt (S #x).
+Now the _>>_ connection is ill-typed. We could solve this by incrementing the upper bound
+on the RHS (it doesn't actually change anything) and then decrementing it once the pop finishes,
+but this is difficult to do because of the structure of statements.
+Mostly because the LHS of a >> could involve any number of pushes that eventually become pops.
+
+I managed to solve this with a somewhat radical restructuring of statements.
+
+In the current setup, statements mutally recurse with sequences of statements.
+The sequence is just a list of statements. Statements like push and match wrap seqeuences.
+
+Evaluation uses another type called a Trace (again, lack of a better name).
+Traces are like sequences, but with an additional constructor _pop_ with the type
+∀ {#x} → Stmt (S #x) → Trace #x → Trace (S #x).
+
+Statement evalutation actually takes as input a statement and a trace and produces a new trace.
+For statements like free, the trace does not change. For statements like push, the trace as the
+wrapped sequence prepended and inserts a pop between the sequence and the old trace.
+
+Trace evalutation steps the statement at the front if possible to produce a new trace.
+If the statement at the front is skip, then it drops it and moves to the rest of the trace,
+potentially popping a stack variable.
+
+Statement typechecking is much like the original Patina model. It takes in some deinitialization
+and loan data and outputs some as well (in Agda these are vectors of Shapes).
+Sequence and Trace typechecking basically just iterates this. Trace checking also
+ensures that popping is allowed (the to-be-popped variable is dropped if necessary).
+
+Configurations bundle up a context, a stack, a heap, and a trace.
+A configuration typechecks if there exists some shape vector such that:
+- The context correctly types the shape vector
+- The shape vector correctly describes memory
+- Memory has no garbage (all heap slots are reachable from the stack)
+- The trace typecheks with the context and shape vector to produce *the empty shape vector*
+  + i.e. The trace evalutates to completion and leaves *no memory* = no leaks
+Configuration evaluation simply lifts trace evaluation to configurations.
+A finished configuration is the empty context, the empty memory, and the empty trace.
+
+Thus, the ultimate statement of progress and preservation for this model are:
+
+Progress:
+∀ C ∈ Config → C typechecks → C is finished OR ∃ C′ ∈ Config, C evaluates to C′.
+
+Preservation:
+∀ C C′ ∈ Config → C typechecks → C evalutes to C′ → C′ typechecks
+
+I've already handled the simplest cases of these two proofs.
+A lot of it is going to rely on lower level progress/preservation proofs.
+For example, statement progress (well typed stmt + well typed trace imply there exist result trace).
+
+Hopefully, this was all somewhat helpful.
