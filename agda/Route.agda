@@ -9,36 +9,46 @@ They are very similar to Paths, but they can point into the internals of Options
 
 They are indexed by the number of allocations in the heap.
 -}
-data Route (#a : ℕ) : Set where
-  -- A route to some allocation of memory in the heap
-  alloc : Fin #a → Route #a
-  -- A route that follows a route stored at the dereferenced route
-  * : Route #a → Route #a
-  -- A route that offsets from the wrapped route
-  <_>_∙_ : (n : ℕ) → Route #a → Fin n → Route #a
+data Route (#x #a : ℕ) : Set where
+  stack : Fin #x → Route #x #a
+  heap : Fin #a → Route #x #a
+  * : Route #x #a → Route #x #a
+  <_>_∙_ : (n : ℕ) → Route #x #a → Fin n → Route #x #a
+
+-- upshifting and downshifting for the #x and #a indicies of Route
+↑#x-r : ∀ {#x #a} → ℕ → Route #x #a → Route (S #x) #a
+↑#x-r c (stack x) = stack (↑ c x)
+↑#x-r c (heap a) = heap a
+↑#x-r c (* r) = * (↑#x-r c r)
+↑#x-r c (< n > r ∙ f) = < n > ↑#x-r c r ∙ f
+
+data ↓#x-r {#x #a} : ℕ → Route (S #x) #a → Route #x #a → Set where
+  stack : ∀ {c x x′} → ↓ c x x′ → ↓#x-r c (stack x) (stack x′)
+  heap : ∀ {c a} → ↓#x-r c (heap a) (heap a)
+  * : ∀ {c r r′} → ↓#x-r c r r′ → ↓#x-r c (* r) (* r′)
+  ∙ : ∀ {c n r r′ f} → ↓#x-r c r r′ → ↓#x-r c (< n > r ∙ f) (< n > r′ ∙ f)
+
+↑#a-r : ∀ {#x #a} → ℕ → Route #x #a → Route #x (S #a)
+↑#a-r c (stack x) = stack x
+↑#a-r c (heap a) = heap (↑ c a)
+↑#a-r c (* r) = * (↑#a-r c r)
+↑#a-r c (< n > r ∙ f) = < n > ↑#a-r c r ∙ f
+
+data ↓#a-r {#x #a} : ℕ → Route #x (S #a) → Route #x #a → Set where
+  stack : ∀ {c x} → ↓#a-r c (stack x) (stack x)
+  heap : ∀ {c a a′} → ↓ c a a′ → ↓#a-r c (heap a) (heap a′)
+  * : ∀ {c r r′} → ↓#a-r c r r′ → ↓#a-r c (* r) (* r′)
+  ∙ : ∀ {c n r r′ f} → ↓#a-r c r r′ → ↓#a-r c (< n > r ∙ f) (< n > r′ ∙ f)
 
 {-
 Typing for Routes. It is similar to typing for Paths.
 However, note the additional constructors for the two components of Options.
 -}
-data _⊢_∶_route {#a #ℓ} (σ : Vec (Type #ℓ) #a) : Route #a → Type #ℓ → Set where
-  alloc : ∀ {α} → σ ⊢ alloc α ∶ σ ! α route
-  *~ : ∀ {r τ} → σ ⊢ r ∶ ~ τ route → σ ⊢ * r ∶ τ route
-  *& : ∀ {r ℓ μ τ} → σ ⊢ r ∶ & ℓ μ τ route → σ ⊢ * r ∶ τ route
---  ∙ : ∀ {n r f τs} → σ ⊢ r ∶ rec τs route → σ ⊢ < n > r ∙ f ∶ τs ! f route
-  disc : ∀ {r τ} → σ ⊢ r ∶ opt τ route → σ ⊢ < 2 > r ∙ fin 0 ∶ int route
-  pay : ∀ {r τ} → σ ⊢ r ∶ opt τ route → σ ⊢ < 2 > r ∙ fin 1 ∶ τ route
-
--- Upshifting for the #a index
-↑-alloc-r : ∀ {#a} → (d : ℕ) → ℕ → Route #a → Route (plus d #a)
-↑-alloc-r d c (alloc α) with asℕ α <? c
-↑-alloc-r d c (alloc α) | yes α<c = alloc (expand′ d α)
-↑-alloc-r d c (alloc α) | no  α≥c = alloc (raise d α)
-↑-alloc-r d c (* r) = * (↑-alloc-r d c r)
-↑-alloc-r d c (< n > ρ ∙ f) = < n > ↑-alloc-r d c ρ ∙ f
-
--- Downshifting for the #a index
-data ↓-#a-r {#a} : ℕ → Route (S #a) → Route #a → Set where
-  alloc : ∀ {c a a′} → ↓c c a a′ → ↓-#a-r c (alloc a) (alloc a′)
-  * : ∀ {c r r′} → ↓-#a-r c r r′ → ↓-#a-r c (* r) (* r′)
-  ∙ : ∀ {c n r r′ f} → ↓-#a-r c r r′ → ↓-#a-r c (< n > r ∙ f) (< n > r′ ∙ f)
+data _,_⊢_∶_route {#x #a #ℓ} (Γ : Context #ℓ #x)
+                             (Σ : Context #ℓ #a) : Route #x #a → Type #ℓ → Set where
+  stack : ∀ {x} → Γ , Σ ⊢ stack x ∶ Γ ! x route
+  heap : ∀ {a} → Γ , Σ ⊢ heap a ∶ Σ ! a route
+  *~ : ∀ {r τ} → Γ , Σ ⊢ r ∶ ~ τ route → Γ , Σ ⊢ * r ∶ τ route
+  *& : ∀ {r ℓ μ τ} → Γ , Σ ⊢ r ∶ & ℓ μ τ route → Γ , Σ ⊢ * r ∶ τ route
+  disc : ∀ {r τ} → Γ , Σ ⊢ r ∶ opt τ route → Γ , Σ ⊢ < 2 > r ∙ fin 0 ∶ int route
+  pay : ∀ {r τ} → Γ , Σ ⊢ r ∶ opt τ route → Γ , Σ ⊢ < 2 > r ∙ fin 1 ∶ τ route

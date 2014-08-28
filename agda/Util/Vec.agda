@@ -67,6 +67,20 @@ set : ∀ {A n} → Vec A n → Fin n → A → Vec A n
 set (x ∷ xs) fZ v = v ∷ xs
 set (x ∷ xs) (fS i) v = x ∷ set xs i v
 
+set! : ∀ {A n} → (xs : Vec A n) (i : Fin n) → set xs i (xs ! i) ≡ xs
+set! (x ∷ xs) fZ = refl
+set! (x ∷ xs) (fS i) = cong (_∷_ x) (set! xs i)
+
+All2set : ∀ {A B n P xs ys x y}
+        → All2 {A} {B} P {n} xs ys → (i : Fin n) → P x y → All2 P (set xs i x) (set ys i y)
+All2set (_ ∷ ps) fZ p = p ∷ ps
+All2set (p′ ∷ ps) (fS i) p = p′ ∷ All2set ps i p
+
+All2set′ : ∀ {A B n P xs ys x}
+         → All2 {A} {B} P {n} xs ys → (i : Fin n) → P x (ys ! i) → All2 P (set xs i x) ys
+All2set′ (_ ∷ ps) fZ p = p ∷ ps
+All2set′ (p′ ∷ ps) (fS i) p = p′ ∷ All2set′ ps i p
+
 _⊗_ : ∀ {n A B} → Vec (A → B) n → Vec A n → Vec B n
 [] ⊗ [] = []
 (f ∷ fs) ⊗ (x ∷ xs) = f x ∷ fs ⊗ xs
@@ -169,9 +183,11 @@ test-remove-elem-2 = re-S re-Z
 test-remove-elem-3 : remove-elem ([ 0 ,, 1 ,, 2 ]) (fin 2) ([ 0 ,, 1 ])
 test-remove-elem-3 = re-S (re-S re-Z)
 
+{-
 data ↓xs {n} : ∀ {m} → ℕ → Vec (Fin (S n)) m → Vec (Fin n) m → Set where
   [] : ∀ {c} → ↓xs c [] []
   _∷_ : ∀ {m c i is j} {js : Vec (Fin n) m}
       → ↓c c i j
       → ↓xs c is js
       → ↓xs c (i ∷ is) (j ∷ js)
+      -}

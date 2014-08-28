@@ -60,22 +60,31 @@ private
 EqLife : ∀ {#ℓ} → Eq (Life #ℓ)
 EqLife = record { _==_ = _=life=_ }
 
+-- upshifting and downshifting for lifetimes
+↑#ℓ-ℓ : ∀ {#ℓ} → ℕ → Life #ℓ → Life (S #ℓ)
+↑#ℓ-ℓ c static = static
+↑#ℓ-ℓ c (val ℓ) = val (↑ c ℓ)
+
+data ↓#ℓ-ℓ {#ℓ} : ℕ → Life (S #ℓ) → Life #ℓ → Set where
+  static : ∀ {c} → ↓#ℓ-ℓ c static static
+  val : ∀ {c ℓ ℓ′} → ↓ c ℓ ℓ′ → ↓#ℓ-ℓ c (val ℓ) (val ℓ′)
+
 -- The ordering relationship on lifetimes.
-data _∣_<:_ (#ℓ : ℕ) : Life #ℓ → Life #ℓ → Set where
+data _:<:_ {#ℓ : ℕ} : Life #ℓ → Life #ℓ → Set where
   -- The relationship is reflexive for all three constructors
   --var-refl : ∀ {Ł} → #ℓ , #Ł ∣ var Ł <: var Ł
-  static-refl : #ℓ ∣ static <: static
+  static-refl : static :<: static
   -- Values are less than both static and any variable
   --val-var : ∀ {ℓ Ł} → #ℓ , #Ł ∣ val ℓ <: var Ł
-  val-static : ∀ {ℓ} → #ℓ  ∣ val ℓ <: static
+  val-static : ∀ {ℓ} → val ℓ :<: static
   -- A lower (newer) value is less than a larger (older) value
-  val-val : ∀ {ℓ₁ ℓ₂} → asℕ ℓ₁ ≤ asℕ ℓ₂ → #ℓ ∣ val ℓ₁ <: val ℓ₂
+  val-val : ∀ {ℓ₁ ℓ₂} → asℕ ℓ₁ ≤ asℕ ℓ₂ → val ℓ₁ :<: val ℓ₂
 
 --test-sublife-1 : 0 , 10 ∣ var fZ <: var fZ
 --test-sublife-1 = var-refl
 --test-sublife-2 : ¬ (0 , 10 ∣ var fZ <: var (fin 1))
 --test-sublife-2 ()
-test-sublife-3 : Z ∣ static <: static
+test-sublife-3 : static {10} :<: static
 test-sublife-3 = static-refl
 --test-sublife-4 : ¬ (Z , 10 ∣ static <: var fZ)
 --test-sublife-4 ()
@@ -83,11 +92,11 @@ test-sublife-3 = static-refl
 --test-sublife-5 ()
 --test-sublife-6 : 10 , 10 ∣ val fZ <: var fZ
 --test-sublife-6 = val-var
-test-sublife-7 : 10 ∣ val fZ <: static
+test-sublife-7 : val {10} fZ :<: static
 test-sublife-7 = val-static
 --test-sublife-8 : ¬ (10 , 10 ∣ var fZ <: val fZ)
 --test-sublife-8 ()
-test-sublife-9 : 10 ∣ val (fin 3) <: val (fin 8)
+test-sublife-9 : val {10} (fin 3) :<: val (fin 8)
 test-sublife-9 = val-val (s<s (s<s (s<s z<s)))
-test-sublife-10 : ¬ (10 ∣ val (fin 8) <: val (fin 3))
+test-sublife-10 : ¬ (val {10} (fin 8) :<: val (fin 3))
 test-sublife-10 (val-val (s<s (s<s (s<s (s<s ())))))

@@ -61,59 +61,18 @@ EqType = record { _==_ = _=type=_ }
 Context : ℕ → ℕ → Set
 Context #ℓ #x = Vec (Type #ℓ) #x
 
--- Upshift the #ℓ index by d with a cutoff of c
-↑-#ℓ-t : ∀ {#ℓ} → (d : ℕ) → ℕ → Type #ℓ → Type (plus d #ℓ)
-↑-#ℓ-t d c int = int
-↑-#ℓ-t d c (~ τ) = ~ (↑-#ℓ-t d c τ)
---↑-#ℓ-t d c (& (var Ł) μ τ) = & (var Ł) μ (↑-#ℓ-t d c τ)
-↑-#ℓ-t d c (& static μ τ) = & static μ (↑-#ℓ-t d c τ)
-↑-#ℓ-t d c (& (val ℓ) μ τ) with asℕ ℓ <? c
-↑-#ℓ-t d c (& (val ℓ) μ τ) | yes ℓ<c = & (val (expand′ d ℓ)) μ (↑-#ℓ-t d c τ)
-↑-#ℓ-t d c (& (val ℓ) μ τ) | no  ℓ≥c = & (val (raise d ℓ)) μ (↑-#ℓ-t d c τ)
-↑-#ℓ-t d c (opt τ) = opt (↑-#ℓ-t d c τ)
+-- upshift and downshift for the indicies of types
+↑#ℓ-τ : ∀ {#ℓ} → ℕ → Type #ℓ → Type (S #ℓ)
+↑#ℓ-τ c int = int
+↑#ℓ-τ c (~ τ) = ~ (↑#ℓ-τ c τ)
+↑#ℓ-τ c (& ℓ μ τ) = & (↑#ℓ-ℓ c ℓ) μ (↑#ℓ-τ c τ)
+↑#ℓ-τ c (opt τ) = opt (↑#ℓ-τ c τ)
 
-↑-#ℓ-t′ : ∀ {#ℓ} → (d : ℕ) → ℕ → Type #ℓ → Type (plus #ℓ d)
-↑-#ℓ-t′ {#ℓ} d c τ rewrite plus-comm #ℓ d = ↑-#ℓ-t d c τ
-
-{-
-↑-#Ł-t : ∀ {#ℓ #Ł} → (d : ℕ) → ℕ → Type #ℓ #Ł → Type #ℓ (plus d #Ł)
-↑-#Ł-t d c int = int
-↑-#Ł-t d c (~ τ) = ~ (↑-#Ł-t d c τ)
-↑-#Ł-t d c (& (var Ł) μ τ) with asℕ Ł <? c
-↑-#Ł-t d c (& (var Ł) μ τ) | yes Ł<c = & (var (expand′ d Ł)) μ (↑-#Ł-t d c τ)
-↑-#Ł-t d c (& (var Ł) μ τ) | no  Ł≥c = & (var (raise d Ł)) μ (↑-#Ł-t d c τ)
-↑-#Ł-t d c (& static μ τ) = & static μ (↑-#Ł-t d c τ)
-↑-#Ł-t d c (& (val Ł) μ τ) = & (val Ł) μ (↑-#Ł-t d c τ)
-↑-#Ł-t d c (opt τ) = opt (↑-#Ł-t d c τ)
-
-↑-#Ł-t′ : ∀ {#Ł #ℓ} → (d : ℕ) → ℕ → Type #ℓ #Ł → Type #ℓ (plus #Ł d)
-↑-#Ł-t′ {#Ł} d c τ rewrite plus-comm #Ł d = ↑-#Ł-t d c τ
--}
-
--- Downshift the index #ℓ by 1 with a cutoff of c
-data ↓1-#ℓ-t {#ℓ} : ℕ → Type (S #ℓ) → Type #ℓ → Set where
-  int : ∀ {c} → ↓1-#ℓ-t c int int
-  ~ : ∀ {c τ τ′} → ↓1-#ℓ-t c τ τ′ → ↓1-#ℓ-t c (~ τ) (~ τ′)
-  & : ∀ {c ℓ ℓ′ μ τ τ′}
-    → ↓c c ℓ ℓ′
-    → ↓1-#ℓ-t c τ τ′
-    → ↓1-#ℓ-t c (& (val ℓ) μ τ) (& (val ℓ′) μ τ′)
-  opt : ∀ {c τ τ′} → ↓1-#ℓ-t c τ τ′ → ↓1-#ℓ-t c (opt τ) (opt τ′)
-
---data ↓1-#ℓ-ts {#ℓ} : ∀ {n} → ℕ → Vec (Type (S #ℓ)) n → Vec (Type #ℓ) n → Set where
-data ↓1-#ℓ-ts {#ℓ} : ∀ {n} → ℕ → Context (S #ℓ) n → Context #ℓ n → Set where
-  [] : ∀ {c} → ↓1-#ℓ-ts c [] []
-  _∷_ : ∀ {n c τ τ′ τs} {τs′ : Vec (Type #ℓ) n}
-      → ↓1-#ℓ-t c τ τ′
-      → ↓1-#ℓ-ts c τs τs′
-      → ↓1-#ℓ-ts c (τ ∷ τs) (τ′ ∷ τs′) 
-
-test-↓1-#ℓ-t-1 : ↓1-#ℓ-t {5} 3 int int
-test-↓1-#ℓ-t-1 = int
-test-↓1-#ℓ-t-2 : ↓1-#ℓ-t {5} 3 (& (val (fin 0)) imm int) (& (val (fin 0)) imm int)
-test-↓1-#ℓ-t-2 = & Z int
-test-↓1-#ℓ-t-3 : ↓1-#ℓ-t {5} 3 (& (val (fin 3)) imm int) (& (val (fin 2)) imm int)
-test-↓1-#ℓ-t-3 = & (S≥ (s<s (s<s (s<s z<s)))) int
+data ↓#ℓ-τ {#ℓ} : ℕ → Type (S #ℓ) → Type #ℓ → Set where
+  int : ∀ {c} → ↓#ℓ-τ c int int
+  ~ : ∀ {c τ τ′} → ↓#ℓ-τ c τ τ′ → ↓#ℓ-τ c (~ τ) (~ τ′)
+  & : ∀ {c ℓ ℓ′ μ τ τ′} → ↓#ℓ-ℓ c ℓ ℓ′ → ↓#ℓ-τ c τ τ′ → ↓#ℓ-τ c (& ℓ μ τ) (& ℓ′ μ τ′)
+  opt : ∀ {c τ τ′} → ↓#ℓ-τ c τ τ′ → ↓#ℓ-τ c (opt τ) (opt τ′)
 
 -- The subtyping relationship
 data _<:_ {#ℓ} : Type #ℓ → Type #ℓ → Set where
@@ -122,11 +81,11 @@ data _<:_ {#ℓ} : Type #ℓ → Type #ℓ → Set where
     → τ₁ <: τ₂
     → ~ τ₁ <: ~ τ₂
   &imm : ∀ {ℓ₁ ℓ₂ τ₁ τ₂}
-       → #ℓ ∣ ℓ₂ <: ℓ₁
+       → ℓ₂ :<: ℓ₁
        → τ₁ <: τ₂
        → & ℓ₁ imm τ₁ <: & ℓ₂ imm τ₂
   &mut : ∀ {ℓ₁ ℓ₂ τ}
-       → #ℓ ∣ ℓ₂ <: ℓ₁
+       → ℓ₂ :<: ℓ₁
        → & ℓ₁ mut τ <: & ℓ₂ mut τ
   opt : ∀ {τ₁ τ₂}
       → τ₁ <: τ₂

@@ -1,5 +1,6 @@
 open import Common
 open import Route
+open import Shape
 open import Type
 {-
 The representation of heap in the Redex Patina model (a mapping from address to values)
@@ -13,146 +14,244 @@ Routes serve the purposes of addresses.
 -}
 module Layout where
 
--- A slot of memory that might store a value (i.e. a Maybe or Option)
-data Slot (A : Set) : Set where
-  void : Slot A
-  val : A → Slot A
-
 -- Layouts are indexed by the number of allocations in the heap (b/c of Routes)
-data Layout (#a : ℕ) : Set where
+data Layout (#x #a : ℕ) : Set where
   -- A slot for an integer
-  int : Slot ℕ → Layout #a
+  int : Maybe ℕ → Layout #x #a
   -- A slot for a pointer (represented as a Route)
-  ptr : Slot (Route #a) → Layout #a
+  ptr : Maybe (Route #x #a) → Layout #x #a
   {- A contiguous list of layouts (i.e. a struct or an option).
      Note that the list itself is not a value (no overhead).
      Using a Vec makes it easy to check projections for correctness. -} 
-  rec : ∀ {n} → Vec (Layout #a) n → Layout #a
+  rec : ∀ {n} → Vec (Layout #x #a) n → Layout #x #a
 
--- Upshifting and downshifting
-↑-alloc-ls : ∀ {#a n} → (d : ℕ) → ℕ → Vec (Layout #a) n → Vec (Layout (plus d #a)) n
+↑#x-l : ∀ {#x #a} → ℕ → Layout #x #a → Layout (S #x) #a
+↑#x-l c (int n?) = int n?
+↑#x-l c (ptr r?) = ptr (mmap (↑#x-r c) r?)
+↑#x-l c (rec ls) = rec (↑#x-ls ls)
+  where
+  ↑#x-ls : ∀ {#x #a n} → Vec (Layout #x #a) n → Vec (Layout (S #x) #a) n
+  ↑#x-ls [] = []
+  ↑#x-ls (x ∷ xs) = ↑#x-l c x ∷ ↑#x-ls xs
 
-↑-alloc-l : ∀ {#a} → (d : ℕ) → ℕ → Layout #a → Layout (plus d #a)
-↑-alloc-l d c (int n) = int n
-↑-alloc-l d c (ptr void) = ptr void
-↑-alloc-l d c (ptr (val r)) = ptr (val (↑-alloc-r d c r))
-↑-alloc-l d c (rec ls) = rec (↑-alloc-ls d c ls)
+data ↓#x-l {#x #a} : ℕ → Layout (S #x) #a → Layout #x #a → Set where
+  int : ∀ {c n} → ↓#x-l c (int n) (int n)
+  ptr : ∀ {c r r′} → mlift (↓#x-r c) r r′ → ↓#x-l c (ptr r) (ptr r′)
+  rec : ∀ {n c ls ls′} → All2 (↓#x-l c) {n} ls ls′ → ↓#x-l c (rec ls) (rec ls′)
 
-↑-alloc-ls d c [] = []
-↑-alloc-ls d c (l ∷ ls) = ↑-alloc-l d c l ∷ ↑-alloc-ls d c ls
+↑#a-l : ∀ {#x #a} → ℕ → Layout #x #a → Layout #x (S #a)
+↑#a-l c (int n?) = int n?
+↑#a-l c (ptr r?) = ptr (mmap (↑#a-r c) r?)
+↑#a-l c (rec ls) = rec (↑#a-ls ls)
+  where
+  ↑#a-ls : ∀ {#x #a n} → Vec (Layout #x #a) n → Vec (Layout #x (S #a)) n
+  ↑#a-ls [] = []
+  ↑#a-ls (x ∷ xs) = ↑#a-l c x ∷ ↑#a-ls xs
 
-data ↓-#a-vr {#a} : ℕ → Slot (Route (S #a)) → Slot (Route #a) → Set where
-  void : ∀ {c} → ↓-#a-vr c void void
-  val : ∀ {c r r′} → ↓-#a-r c r r′ → ↓-#a-vr c (val r) (val r′)
+data ↓#a-l {#x #a} : ℕ → Layout #x (S #a) → Layout #x #a → Set where
+  int : ∀ {c n} → ↓#a-l c (int n) (int n)
+  ptr : ∀ {c r r′} → mlift (↓#a-r c) r r′ → ↓#a-l c (ptr r) (ptr r′)
+  rec : ∀ {n c ls ls′} → All2 (↓#a-l c) {n} ls ls′ → ↓#a-l c (rec ls) (rec ls′)
 
-data ↓-#a-ls {#a} : ∀ {n} → ℕ → Vec (Layout (S #a)) n → Vec (Layout #a) n → Set
+  {-
+data void-layout {#x #a #ℓ} : Type #ℓ → Layout #x #a → Set where
+  int : void-layout int (int none)
+  ~ : ∀ {τ} → void-layout (~ τ) (ptr none)
+  & : ∀ {ℓ μ τ} → void-layout (& ℓ μ τ) (ptr none)
+  opt : ∀ {τ l} → void-layout τ l → void-layout (opt τ) (rec ([ int none ,, l ]))
+  -}
+void-layout : ∀ {#x #a #ℓ} → Type #ℓ → Layout #x #a
+void-layout int = int none
+void-layout (~ τ) = ptr none
+void-layout (& ℓ μ τ) = ptr none
+void-layout (opt τ) = rec ([ int none ,, void-layout τ ])
 
-data ↓-#a-l {#a} : ℕ → Layout (S #a) → Layout #a → Set where
-  int : ∀ {c n} → ↓-#a-l c (int n) (int n)
-  ptr : ∀ {c r r′} → ↓-#a-vr c r r′ → ↓-#a-l c (ptr r) (ptr r′)
-  rec : ∀ {n c ls} {ls′ : Vec (Layout #a) n} → ↓-#a-ls c ls ls′ → ↓-#a-l c (rec ls) (rec ls′)
-
-data ↓-#a-ls {#a} where
-  [] : ∀ {c} → ↓-#a-ls c [] []
-  _∷_ : ∀ {n c l ls l′} {ls′ : Vec (Layout #a) n}
-      → ↓-#a-l c l l′
-      → ↓-#a-ls c ls ls′
-      → ↓-#a-ls c (l ∷ ls) (l′ ∷ ls′)
-
-data layoutof {#a #ℓ} :  Type #ℓ → Layout #a → Set where
-  int : layoutof int (int void) 
-  ~ : ∀ {τ} → layoutof (~ τ) (ptr void)
-  & : ∀ {ℓ μ τ} → layoutof (& ℓ μ τ) (ptr void)
-  opt : ∀ {τ l} → layoutof τ l → layoutof (opt τ) (rec ([ int void ,, l ]))
-
--- A heap is simply a vector of layouts
-Heap : ℕ → Set
-Heap #a = Vec (Layout #a) #a
--- A map is simply a vectory of indexes into the heap
-Map : ℕ → ℕ → Set
-Map #a #x = Vec (Fin #a) #x
+Stack : ℕ → ℕ → Set
+Stack #x #a = Vec (Layout #x #a) #x
+Heap : ℕ → ℕ → Set
+Heap #x #a = Vec (Layout #x #a) #a
+Mem : ℕ → ℕ → Set
+Mem #x #a = Stack #x #a × Heap #x #a
 
 -- Reading memory (given a heap and a route [address], produce a layout [value])
 -- Note that this makes block reading very easy
-data _⊢_⇒_ {#a} : Heap #a → Route #a → Layout #a → Set where
-  alloc : ∀ {H α} → H ⊢ alloc α ⇒ (H ! α)
-  * : ∀ {H r r′ l} → H ⊢ r ⇒ ptr (val r′) → H ⊢ r′ ⇒ l → H ⊢ * r ⇒ l
-  ∙ : ∀ {H r n f ls} → H ⊢ r ⇒ rec ls → H ⊢ < n > r ∙ f ⇒ (ls ! f)
+data _⊢_⇒_ {#x #a} : Mem #x #a → Route #x #a → Layout #x #a → Set where
+  stack : ∀ {S H x} → (S , H) ⊢ stack x ⇒ (S ! x)
+  heap : ∀ {S H a} → (S , H) ⊢ heap a ⇒ (H ! a)
+  * : ∀ {M r r′ l} → M ⊢ r ⇒ ptr (just r′) → M ⊢ r′ ⇒ l → M ⊢ * r ⇒ l
+  ∙ : ∀ {M r n f ls} → M ⊢ r ⇒ rec ls → M ⊢ < n > r ∙ f ⇒ (ls ! f)
 
 -- Writing memory (given a heap, a route [address], and a layout [value], produce a new heap)
 -- Note that this makes block writing very easy
-data _⊢_≔_⇒_ {#a} : Heap #a → Route #a → Layout #a → Heap #a → Set where
-  alloc : ∀ {H α l} → H ⊢ alloc α ≔ l ⇒ set H α l
-  * : ∀ {H r r′ l H′} → H ⊢ r ⇒ ptr (val r′) → H ⊢ r′ ≔ l ⇒ H′ → H ⊢ * r ≔ l ⇒ H′
-  ∙ : ∀ {H r n f ls l H′}
-    → H ⊢ r ⇒ rec ls
-    → H ⊢ r ≔ rec (set ls f l) ⇒ H′
-    → H ⊢ < n > r ∙ f ≔ l ⇒ H′
+data _⊢_≔_⇒_ {#x #a} : Mem #x #a → Route #x #a → Layout #x #a → Mem #x #a → Set where
+  stack : ∀ {S H x l} → (S , H) ⊢ stack x ≔ l ⇒ (set S x l , H)
+  heap : ∀ {S H a l} → (S , H) ⊢ heap a ≔ l ⇒ (S , set H a l)
+  * : ∀ {M r r′ l M′} → M ⊢ r ⇒ ptr (just r′) → M ⊢ r′ ≔ l ⇒ M′ → M ⊢ * r ≔ l ⇒ M′
+  ∙ : ∀ {M r n f ls l M′} → M ⊢ r ⇒ rec ls → M ⊢ r ≔ rec (set ls f l) ⇒ M′ → M ⊢ < n > r ∙ f ≔ l ⇒ M′
+
+-- Moving read
+data _⊢_∶_⇒_,_ {#x #a #ℓ} : Mem #x #a → Route #x #a → Type #ℓ → Layout #x #a → Mem #x #a → Set where
+  copy : ∀ {M r τ l}
+       → τ Copy
+       → M ⊢ r ⇒ l
+       → M ⊢ r ∶ τ ⇒ l , M
+  move : ∀ {M r τ l M′}
+       → τ Affine
+       → M ⊢ r ⇒ l
+       → M ⊢ r ≔ void-layout τ ⇒ M′
+       → M ⊢ r ∶ τ ⇒ l , M′
+
+test-moving-read-1 : (([ int (just 1) ]) , [])
+                   ⊢ stack fZ ∶ int {0} ⇒ int (just 1)
+                   , (([ int (just 1) ]) , [])
+test-moving-read-1 = copy int stack
+test-moving-read-2 : (([ ptr (just (heap fZ)) ]) , ([ int none ]))
+                   ⊢ stack fZ ∶ ~ {0} int ⇒ ptr (just (heap fZ))
+                   , (([ ptr none ]) , ([ int none ]))
+test-moving-read-2 = move ~Aff stack stack
 
 -- Memcopy (given a heap, a source route, and a destination route, produce a new heap)
 -- Note that we do not need to specify the size. We copy the whole of whatever we point to.
-_⊢_to_⇒_ : ∀ {#a} → Heap #a → Route #a → Route #a → Heap #a → Set
-H ⊢ src to dst ⇒ H′ = Σ[ l ∈ Layout _ ] H ⊢ src ⇒ l × H ⊢ dst ≔ l ⇒ H′
+_⊢_to_⇒_ : ∀ {#x #a} → Mem #x #a → Route #x #a → Route #x #a → Mem #x #a → Set
+M ⊢ src to dst ⇒ M′ = Σ[ l ∈ Layout _ _ ] M ⊢ src ⇒ l × M ⊢ dst ≔ l ⇒ M′
 
--- Typing for layouts (i.e. typing for heap values)
--- A heap type would simply be a vector of types #a long
-data _⊢_∶_layout {#a #ℓ} (σ : Vec (Type #ℓ) #a) : Layout #a → Type #ℓ → Set where
+-- Typing for layouts
+data _,_⊢_∶_layout {#x #a #ℓ} (Γ : Context #ℓ #x)
+                              (Σ : Context #ℓ #a) : Layout #x #a → Type #ℓ → Set where
   -- Integer slots can only be integers
-  int : ∀ {n} → σ ⊢ int n ∶ int layout
+  int : ∀ {n?} → Γ , Σ ⊢ int n? ∶ int layout
   -- A pointer slot can be either kind of pointer (~ or &)
   -- If it is initialized, then it points to whatever the type of the wrapped route is
   -- If it is uninitialized, then it can point to anything
-  ptr~ : ∀ {r τ} → σ ⊢ r ∶ τ route → σ ⊢ ptr (val r) ∶ ~ τ layout
-  ⊥~ : ∀ {τ} → σ ⊢ ptr void ∶ ~ τ layout
-  ptr& : ∀ {r ℓ μ τ} → σ ⊢ r ∶ τ route → σ ⊢ ptr (val r) ∶ & ℓ μ τ layout
-  ⊥& : ∀ {ℓ μ τ} → σ ⊢ ptr void ∶ & ℓ μ τ layout
+  ptr~ : ∀ {r τ} → Γ , Σ ⊢ r ∶ τ route → Γ , Σ ⊢ ptr (just r) ∶ ~ τ layout
+  ⊥~ : ∀ {τ} → Γ , Σ ⊢ ptr none ∶ ~ τ layout
+  ptr& : ∀ {r ℓ μ τ} → Γ , Σ ⊢ r ∶ τ route → Γ , Σ ⊢ ptr (just r) ∶ & ℓ μ τ layout
+  ⊥& : ∀ {ℓ μ τ} → Γ , Σ ⊢ ptr none ∶ & ℓ μ τ layout
   -- Options are represented as a int and a payload slot, so we just check the pieces
-  opt : ∀ {τ d p} → σ ⊢ d ∶ int layout → σ ⊢ p ∶ τ layout
-      → σ ⊢ rec ([ d ,, p ]) ∶ opt τ layout
---  rec : ∀ {n} {ls : Vec (Layout #a) n} {τs : Vec Type n}
---      → All (λ {(l , τ) → σ ⊢ l ∶ τ layout}) (zip ls τs)
---      → σ ⊢ rec ls ∶ rec τs layout
+  opt : ∀ {τ d p} → Γ , Σ ⊢ d ∶ int layout → Γ , Σ ⊢ p ∶ τ layout
+      → Γ , Σ ⊢ rec ([ d ,, p ]) ∶ opt τ layout
 
-_⊢_heap : ∀ {#ℓ #a} → Context #ℓ #a → Heap #a → Set
-σ ⊢ H heap = All2 (λ τ l → σ ⊢ l ∶ τ layout) σ H
-
--- Consistency of heap types
-_,_⊢_heap-type : ∀ {#ℓ #x #a} → Context #ℓ #x → Map #a #x → Context #ℓ #a → Set
-Γ , V ⊢ σ heap-type = All2 (λ τ α → τ ≡ σ ! α) Γ V
+_,_⊢_mem : ∀ {#x #a #ℓ} → Context #ℓ #x → Context #ℓ #a → Mem #x #a → Set
+Γ , Σ ⊢ St , H mem = All2 (λ l τ → Γ , Σ ⊢ l ∶ τ layout) St Γ
+                   × All2 (λ l τ → Γ , Σ ⊢ l ∶ τ layout) H Σ
 
 -- Reading preserves types
-reading-preserves-types : ∀ {#ℓ #a H r τ l} {σ : Context #ℓ #a}
-                        → σ ⊢ H heap
-                        → σ ⊢ r ∶ τ route
-                        → H ⊢ r ⇒ l
-                        → σ ⊢ l ∶ τ layout
-reading-preserves-types σ⊢H (alloc {α}) alloc = σ⊢H All2! α
-reading-preserves-types σ⊢H (*~ r∶~τ) (* r⇒r′ r′⇒l) with reading-preserves-types σ⊢H r∶~τ r⇒r′
-... | ptr~ r′∶τ = reading-preserves-types σ⊢H r′∶τ r′⇒l
-reading-preserves-types σ⊢H (*& r∶&τ) (* r⇒r′ r′⇒l) with reading-preserves-types σ⊢H r∶&τ r⇒r′
-... | ptr& r′∶τ = reading-preserves-types σ⊢H r′∶τ r′⇒l
-reading-preserves-types σ⊢H (disc r∶τ) (∙ r⇒l) with reading-preserves-types σ⊢H r∶τ r⇒l
+read-preservation : ∀ {#x #a #ℓ r l Γ Σ} {M : Mem #x #a} {τ : Type #ℓ}
+                  → Γ , Σ ⊢ M mem
+                  → Γ , Σ ⊢ r ∶ τ route
+                  → M ⊢ r ⇒ l
+                  → Γ , Σ ⊢ l ∶ τ layout
+read-preservation (⊢S , ⊢H) (stack {x}) stack = ⊢S All2! x
+read-preservation (⊢S , ⊢H) (heap {a}) heap = ⊢H All2! a
+read-preservation ⊢M (*~ r∶~τ) (* r⇒r′ r′⇒l) with read-preservation ⊢M r∶~τ r⇒r′
+... | ptr~ r′∶τ = read-preservation ⊢M r′∶τ r′⇒l
+read-preservation ⊢M (*& r∶&τ) (* r⇒r′ r′⇒l) with read-preservation ⊢M r∶&τ r⇒r′
+... | ptr& r′∶τ = read-preservation ⊢M r′∶τ r′⇒l
+read-preservation ⊢M (disc r∶opt-τ) (∙ r⇒l) with read-preservation ⊢M r∶opt-τ r⇒l
 ... | opt ∙0∶int ∙1∶τ = ∙0∶int
-reading-preserves-types σ⊢H (pay r∶τ) (∙ r⇒l) with reading-preserves-types σ⊢H r∶τ r⇒l
+read-preservation ⊢M (pay r∶opt-τ) (∙ r⇒l) with read-preservation ⊢M r∶opt-τ r⇒l
 ... | opt ∙0∶int ∙1∶τ = ∙1∶τ
 
-open import Shape
+-- Writing something of the same type as the route does not change the type of memory
+write-preservation : ∀ {#x #a #ℓ r l Γ Σ} {M M′ : Mem #x #a} {τ : Type #ℓ}
+                   → Γ , Σ ⊢ M mem
+                   → Γ , Σ ⊢ r ∶ τ route
+                   → Γ , Σ ⊢ l ∶ τ layout
+                   → M ⊢ r ≔ l ⇒ M′
+                   → Γ , Σ ⊢ M′ mem
+write-preservation (⊢S , ⊢H) (stack {x}) l∶τ stack = All2set′ ⊢S x l∶τ , ⊢H
+write-preservation (⊢S , ⊢H) (heap {a}) l∶τ heap = ⊢S , All2set′ ⊢H a l∶τ
+write-preservation ⊢M (*~ r∶~τ) l∶τ (* r⇒r′ r′≔l) with read-preservation ⊢M r∶~τ r⇒r′
+... | ptr~ r′∶τ = write-preservation ⊢M r′∶τ l∶τ r′≔l
+write-preservation ⊢M (*& r∶&τ) l∶τ (* r⇒r′ r′≔l) with read-preservation ⊢M r∶&τ r⇒r′
+... | ptr& r′∶τ = write-preservation ⊢M r′∶τ l∶τ r′≔l
+write-preservation ⊢M (disc r∶opt-τ) l∶int (∙ r⇒ls r≔ls′) with read-preservation ⊢M r∶opt-τ r⇒ls
+... | opt ∙0∶int ∙1∶τ = write-preservation ⊢M r∶opt-τ (opt l∶int ∙1∶τ) r≔ls′
+write-preservation ⊢M (pay r∶opt-τ) l∶τ (∙ r⇒ls r≔ls′) with read-preservation ⊢M r∶opt-τ r⇒ls
+... | opt ∙0:int ∙1:τ = write-preservation ⊢M r∶opt-τ (opt ∙0:int l∶τ) r≔ls′
 
--- Correspondence between a Shape and a Layout
-data _⊢_∶_rep {#ℓ #a} : Heap #a → Layout #a → Shape #ℓ → Set where
-  int⊥ : ∀ {H} → H ⊢ int void ∶ int void rep
-  int : ∀ {H n B} → H ⊢ int (val n) ∶ int (init B tt) rep
-  ~⊥ : ∀ {H} → H ⊢ ptr void ∶ ~ void rep
-  ~ : ∀ {H B r δ l} → H ⊢ r ⇒ l → H ⊢ l ∶ δ rep → H ⊢ ptr (val r) ∶ ~ (init B δ) rep
-  &⊥ : ∀ {H} → H ⊢ ptr void ∶ & void rep
-  & : ∀ {H B r τ l} → H ⊢ r ⇒ l → H ⊢ l ∶ init-t τ rep → H ⊢ ptr (val r) ∶ & (init B τ) rep
-  opt⊥ : ∀ {H l} {τ : Type #ℓ}
-       → H ⊢ l ∶ void-t τ rep → H ⊢ rec ([ int void ,, l ]) ∶ opt void rep
-  none : ∀ {H B l} {τ : Type #ℓ}
-       → H ⊢ l ∶ void-t τ rep → H ⊢ rec ([ int (val 0) ,, l ]) ∶ opt (init B tt) rep
-  some : ∀ {H B l} {τ : Type #ℓ}
-       → H ⊢ l ∶ init-t τ rep → H ⊢ rec ([ int (val 1) ,, l ]) ∶ opt (init B tt) rep
+data _⊢_init {#x #a} (M : Mem #x #a) : Layout #x #a → Set where
+  int : ∀ {n} → M ⊢ int (just n) init
+  ptr : ∀ {r l} → M ⊢ r ⇒ l → M ⊢ l init → M ⊢ ptr (just r) init
+  rec : ∀ {n} {ls : Vec (Layout #x #a) n} → All (λ l → M ⊢ l init) ls → M ⊢ rec ls init
 
--- Initialization of the heap
-_,_⊢_heap-state : ∀ {#ℓ #x #a} → State #ℓ #x → Map #a #x → Heap #a → Set
-Δ , V ⊢ H heap-state = All2 (λ δ α → H ⊢ H ! α ∶ δ rep) Δ V
+data _void {#x #a} : Layout #x #a → Set where
+  int : int none void
+  ptr : ptr none void
+  rec : ∀ {n} {ls : Vec (Layout #x #a) n} → All _void ls → rec ls void
+
+-- -- Correspondence between a Shape and a Layout
+data _⊢_∶_rep {#ℓ #x #a} (M : Mem #x #a) : Layout #x #a → Shape #ℓ → Set where
+  int⊥ : M ⊢ int none ∶ int none rep
+  int : ∀ {n b} → M ⊢ int (just n) ∶ int (just b) rep
+  ~⊥ : M ⊢ ptr none ∶ ~ none rep
+  ~ : ∀ {r δ b l} → M ⊢ r ⇒ l → M ⊢ l ∶ δ rep → M ⊢ ptr (just r) ∶ ~ (just (b , δ)) rep
+  &⊥ : M ⊢ ptr none ∶ & none rep
+  & : ∀ {r b l} → M ⊢ r ⇒ l → M ⊢ l init → M ⊢ ptr (just r) ∶ & (just b) rep
+  opt⊥ : ∀ {l} → l void → M ⊢ rec ([ int none ,, l ]) ∶ opt none rep
+  none : ∀ {b l} → M ⊢ l init → M ⊢ rec ([ int (just 0) ,, l ]) ∶ opt (just b) rep
+  some : ∀ {b l} → M ⊢ l init → M ⊢ rec ([ int (just 1) ,, l ]) ∶ opt (just b) rep
+
+_⊢_mem-state : ∀ {#ℓ #x #a} → State #ℓ #x → Mem #x #a → Set
+Δ ⊢ M mem-state = All2 (λ δ l → M ⊢ l ∶ δ rep) Δ (fst M)
+
+data _⊢_reaches_layout {#x #a} (M : Mem #x #a) : Layout #x #a → Fin #a → Set
+data _⊢_reaches_route {#x #a} (M : Mem #x #a) : Route #x #a → Fin #a → Set
+
+data _⊢_reaches_layout {#x #a} (M : Mem #x #a) where
+  ptr : ∀ {r a} → M ⊢ r reaches a route → M ⊢ ptr (just r) reaches a layout
+  rec : ∀ {n a} {ls : Vec _ n} → Any (λ l → M ⊢ l reaches a layout) ls → M ⊢ rec ls reaches a layout
+
+data _⊢_reaches_route {#x #a} (M : Mem #x #a) where
+  refl : ∀ {a} → M ⊢ heap a reaches a route
+  stack : ∀ {x a} → M ⊢ fst M ! x reaches a layout → M ⊢ stack x reaches a route
+  heap : ∀ {a′ a} → M ⊢ snd M ! a′ reaches a layout → M ⊢ heap a′ reaches a route
+  * : ∀ {r a} → M ⊢ r reaches a route → M ⊢ * r reaches a route
+  ∙ : ∀ {n r f a} → M ⊢ r reaches a route → M ⊢ < n > r ∙ f reaches a route
+
+_⊢_reachable : ∀ {#x #a} → Mem #x #a → Fin #a → Set
+M ⊢ a reachable = Any (λ l → M ⊢ l reaches a layout) (fst M)
+
+NoGarbage : ∀ {#a #x} → Mem #x #a → Set
+NoGarbage {#a} M = All (λ a → M ⊢ a reachable) (range′ #a)
+
+private
+  M : Mem 4 4
+  M = ([ int (just 1) ,, ptr (just (heap fZ)) ,, int none
+      ,, rec ([ int none ,, ptr (just (heap (fin 2))) ]) ])
+    , ([ ptr (just (* (stack (fin 2)))) ,, int (just 2) ,, ptr (just (heap (fin 1))) ,, int none ])
+
+  M-0 : M ⊢ fin 0 reachable
+  M-0 = S (Z (ptr refl))
+  M-1 : M ⊢ fin 1 reachable
+  M-1 = S (S (S (Z (rec (S (Z (ptr (heap (ptr refl)))))))))
+  M-2 : M ⊢ fin 2 reachable
+  M-2 = S (S (S (Z (rec (S (Z (ptr refl)))))))
+  M-3 : ¬ (M ⊢ fin 3 reachable)
+  M-3 (Z ())
+  M-3 (S (Z (ptr (heap (ptr (* (stack ())))))))
+  M-3 (S (S (Z ())))
+  M-3 (S (S (S (Z (rec (Z ()))))))
+  M-3 (S (S (S (Z (rec (S (Z (ptr (heap (ptr (heap ())))))))))))
+  M-3 (S (S (S (Z (rec (S (S ())))))))
+  M-3 (S (S (S (S ()))))
+
+  M-NG : ¬ (NoGarbage M)
+  M-NG (_ ∷ _ ∷ _ ∷ Z () ∷ [])
+  M-NG (_ ∷ _ ∷ _ ∷ S (Z (ptr (heap (ptr (* (stack ())))))) ∷ [])
+  M-NG (_ ∷ _ ∷ _ ∷ S (S (Z ())) ∷ [])
+  M-NG (_ ∷ _ ∷ _ ∷ S (S (S (Z (rec (Z ()))))) ∷ [])
+  M-NG (_ ∷ _ ∷ _ ∷ S (S (S (Z (rec (S (Z (ptr (heap (ptr (heap ())))))))))) ∷ [])
+  M-NG (_ ∷ _ ∷ _ ∷ S (S (S (Z (rec (S (S ())))))) ∷ [])
+  M-NG (_ ∷ _ ∷ _ ∷ S (S (S (S ()))) ∷ [])
+
+  M′ : Mem 1 2
+  M′ = ([ ptr (just (* (heap fZ))) ]) , ([ ptr (just (heap (fin 1))) ,, int none ])
+
+  M′-0 : M′ ⊢ fin 0 reachable
+  M′-0 = Z (ptr (* refl))
+  M′-1 : M′ ⊢ fin 1 reachable
+  M′-1 = Z (ptr (* (heap (ptr refl))))
+
+  M′-NG : NoGarbage M′
+  M′-NG = Z (ptr (* refl)) ∷ Z (ptr (* (heap (ptr refl)))) ∷ []

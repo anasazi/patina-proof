@@ -97,6 +97,37 @@ private
   test-f+-3 : f+ {2} (fS fZ) 1 (fS (fS fZ))
   test-f+-3 = s+s (z+s f+z)
 
+↑ : ∀ {i} → ℕ → Fin i → Fin (S i)
+↑ c f with asℕ f <? c
+↑ c f | yes f<c = expand′ 1 f
+↑ c f | no  f≥c = raise 1 f
+
+{-
+↑d : ∀ {i} → (d : ℕ) → ℕ → Fin i → Fin (plus d i)
+↑d Z c f = f
+↑d (S d) c f = ↑ c (↑d d c f)
+
+↑d-test-1 : ↑d 3 0 (fin {1} 0) ≡ fin {4} 3
+↑d-test-1 = refl
+↑d-test-2 : ↑d 3 1 (fin {1} 0) ≡ fin {4} 0
+↑d-test-2 = refl
+↑d-test-3 : ↑d 3 2 (fin {5} 3) ≡ fin {8} 6
+↑d-test-3 = refl
+-}
+
+⇑ : ∀ {i} (P : ℕ → Set) (f : ∀ {n} → ℕ → P n → P (S n)) → (d : ℕ) → ℕ → P i → P (plus d i)
+⇑ P f Z c i = i
+⇑ P f (S d) c i = f c (⇑ P f d c i)
+
+⇑′ : ∀ {i} (P : ℕ → Set) (f : ∀ {n} → ℕ → P n → P (S n)) → (d : ℕ) → ℕ → P i → P (plus i d)
+⇑′ {i} P f d c pi rewrite plus-comm i d = ⇑ P f d c pi
+
+data ↓ : ∀ {i} → ℕ → Fin (S i) → Fin i → Set where
+  Z : ∀ {i c} → ↓ {S i} (S c) fZ fZ
+  S< : ∀ {n c f f′} → asℕ (fS f) < S c → ↓ c f f′ → ↓ {S n} (S c) (fS f) (fS f′) 
+  S≥ : ∀ {n c f} → asℕ (fS f) ≥ c → ↓ {S n} c (fS f) f
+
+  {-
 ↑-fin : ∀ {i} → (d : ℕ) → ℕ → Fin i → Fin (plus d i)
 ↑-fin d c f with asℕ f <? c
 ↑-fin d c f | yes f<c = expand′ d f
@@ -125,3 +156,4 @@ test-↓c-4 : ↓c {10} 3 (fin 3) (fin 2)
 test-↓c-4 = S≥ (s<s (s<s (s<s z<s)))
 test-↓c-5 : ↓c 0 (fin {10} 3) (fin 2)
 test-↓c-5 = S≥ z<s
+-}
