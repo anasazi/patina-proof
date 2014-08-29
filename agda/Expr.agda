@@ -42,7 +42,7 @@ data _,_⊢_∶_,_ {#x #ℓ} (Γ : Context #ℓ #x) : State #ℓ #x → Expr #x 
   none : ∀ {Δ τ} → {- TODO wellformed check on τ -} Γ , Δ ⊢ none τ ∶ opt τ , Δ
 
 data _,_⊢_⟶_ {#x #ℓ #a} (Γ : Context #ℓ #x) (M : Mem #x #a) : Expr #x #ℓ
-              → (Layout #x #a × Mem #x #a) + (Layout #x (S #a) × Layout #x #a × Mem #x #a) → Set where
+              → (Layout #x #a × Mem #x #a) + (Layout #x (S #a) × Mem #x (S #a)) → Set where
   int : ∀ {n} → Γ , M ⊢ int n ⟶ inl (int (just n) , M)
   add : ∀ {p₁ p₂ r₁ r₂ n₁ n₂ n}
       → ⊢ p₁ ⟶ r₁
@@ -56,11 +56,12 @@ data _,_⊢_⟶_ {#x #ℓ #a} (Γ : Context #ℓ #x) (M : Mem #x #a) : Expr #x #
       → ⊢ p ⟶ r
       → M ⊢ r ∶ τ ⇒ l , M′
       → Γ , M ⊢ use p ⟶ inl (l , M′)
-  new : ∀ {p τ r l M′}
+  new : ∀ {p τ r l M′ M′′}
       → Γ ⊢ p ∶ τ
       → ⊢ p ⟶ r
       → M ⊢ r ∶ τ ⇒ l , M′
-      → Γ , M ⊢ new p ⟶ inr (ptr (just (heap fZ)) , (l , M′))
+      → (map (↑#a-l 0) *** map (↑#a-l 0)) (second (_∷_ l) M′) ⊢ heap fZ ≔ ↑#a-l 0 l ⇒ M′′
+      → Γ , M ⊢ new p ⟶ inr ((ptr (just (heap fZ))) , M′′)
   some : ∀ {p τ r l M′}
        → Γ ⊢ p ∶ τ
        → ⊢ p ⟶ r
@@ -124,8 +125,8 @@ module TestEval where
            , (([ ptr none ]) , ([ int (just 1) ,, int (just 2) ])))
   rveval-7 = use var var (move ~Aff stack stack)
   rveval-8 : ([ int {0} ]) , ([ int (just 10) ]) , []
-           ⊢ new (var fZ) ⟶ inr (ptr (just (heap fZ)) , (int (just 10) , (([ int (just 10) ]) , [])))
-  rveval-8 = new var var (copy int stack)
+           ⊢ new (var fZ) ⟶ inr (ptr (just (heap fZ)) , (([ int (just 10) ]) , ([ int (just 10) ])))
+  rveval-8 = new var var (copy int stack) heap
 
 -- -- Exprs are indexed by the number of variables and the lifetime relation
 -- data Expr : (#x #ℓ : ℕ) → Set where

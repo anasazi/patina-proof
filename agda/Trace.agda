@@ -58,11 +58,11 @@ data stev {#f} (F : Funcs #f) : ∀ {#x #a #ℓ #x′ #a′ #ℓ′}
        → ⊢ p ⟶ r
        → M′ ⊢ r ≔ l ⇒ M′′
        → stev F Γ M (p ← e) t Γ M′′ t
-  ←new : ∀ {#x #a #ℓ p r e lᵥ lₕ St St′ M′ t} {Γ : Context #ℓ #x} {H H′ : Heap #x #a}
-       → Γ , (St , H) ⊢ e ⟶ inr (lᵥ , (lₕ , (St′ , H′)))
+  ←new : ∀ {#x #a #ℓ p r e l t M′ M′′} {Γ : Context #ℓ #x} {M : Mem #x #a}
+       → Γ , M ⊢ e ⟶ inr (l , M′)
        → ⊢ p ⟶ r
-       → (map (↑#a-l 0) St′ , (map (↑#a-l 0) (lₕ ∷ H′))) ⊢ r ≔ lᵥ ⇒ M′
-       → stev F Γ (St , H) (p ← e) t Γ M′ t
+       → M′ ⊢ r ≔ l ⇒ M′′
+       → stev F Γ M (p ← e) t Γ M′′ t
   free : ∀ {#x #a #ℓ p r a St₁ H₂ ↓St₁ ↓H₂ t}
        {Γ : Context #ℓ #x} {M₀ : Mem #x (S #a)} {H₁ : Heap #x (S #a)}
        → ⊢ p ⟶ r
@@ -146,7 +146,7 @@ module TestTrace where
               (([ ptr (just (heap fZ)) ,, int (just 0) ])
              , ([ int (just 0) ,, ptr (just (heap (fin 1))) ]))
              ∅
-  ev-5 = ⟶>> (←new (new var var (copy int stack)) var stack)
+  ev-5 = ⟶>> (←new (new var var (copy int stack) heap) var stack)
   ev-6 : tev [] ([ int {0} ])
              (([ int (just 1) ]) , [])
              (push (~ int) (var fZ ← new (var (fin 1)) >> free (var fZ) >> ∅) >> ∅)
@@ -160,7 +160,7 @@ module TestTrace where
              ([ ~ {0} int ,, int ])
              (([ ptr (just (heap fZ)) ,, int (just 1) ]) , ([ int (just 1) ]))
              (free (var fZ) >> skip pop ∅)
-  ev-7 = ⟶>> (←new (new var var (copy int stack)) var stack)
+  ev-7 = ⟶>> (←new (new var var (copy int stack) heap) var stack)
   ev-8 : tev [] ([ ~ {0} int ,, int ])
              (([ ptr (just (heap fZ)) ,, int (just 1) ]) , ([ int (just 1) ]))
              (free (var fZ) >> skip pop ∅)
