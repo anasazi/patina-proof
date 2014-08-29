@@ -29,6 +29,23 @@ data _⊢_owned {#x #ℓ} (Γ : Context #ℓ #x) : Path #x → Set where
   var : ∀ {x} → Γ ⊢ var x owned
   *~ : ∀ {p τ} → Γ ⊢ p ∶ ~ τ → Γ ⊢ * p owned
 
+path-progress : ∀ {#x #ℓ p τ} {Γ : Context #ℓ #x}
+              → Γ ⊢ p ∶ τ
+              → ∀ {#a} → Σ[ r ∈ Route #x #a ] ⊢ p ⟶ r
+path-progress var = (stack _) , var
+path-progress (*~ p∶~τ) {#a} with path-progress p∶~τ {#a}
+path-progress (*~ p∶~τ) | r , p⟶r = * r , * p⟶r
+path-progress (*& p∶&τ) {#a} with path-progress p∶&τ {#a}
+path-progress (*& p∶&τ) | r , p⟶r = * r , * p⟶r
+
+path-preservation : ∀ {#x #a #ℓ p r τ} {Γ : Context #ℓ #x} {Σ : Context #ℓ #a}
+                  → Γ ⊢ p ∶ τ
+                  → ⊢ p ⟶ r
+                  → Γ , Σ ⊢ r ∶ τ route
+path-preservation var var = stack
+path-preservation (*~ p∶~τ) (* p⟶r) = *~ (path-preservation p∶~τ p⟶r)
+path-preservation (*& p∶&τ) (* p⟶r) = *& (path-preservation p∶&τ p⟶r)
+
 -- open import Common
 -- open import Type
 -- open import Layout
