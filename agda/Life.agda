@@ -69,6 +69,9 @@ data ↓#ℓ-ℓ {#ℓ} : ℕ → Life (S #ℓ) → Life #ℓ → Set where
   static : ∀ {c} → ↓#ℓ-ℓ c static static
   val : ∀ {c ℓ ℓ′} → ↓ c ℓ ℓ′ → ↓#ℓ-ℓ c (val ℓ) (val ℓ′)
 
+Lifes : ℕ → ℕ → Set
+Lifes #ℓ #x = Vec (Life #ℓ) #x
+
 -- The ordering relationship on lifetimes.
 data _:<:_ {#ℓ : ℕ} : Life #ℓ → Life #ℓ → Set where
   -- The relationship is reflexive for all three constructors
