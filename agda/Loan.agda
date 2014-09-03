@@ -65,6 +65,12 @@ record Unborrowed {#ℓ : ℕ} (B : Bank #ℓ) : Set where
     vals-free : All Free (val-loans B)
     static-free : Free (static-loan B)
 
+record NoMuts {#ℓ} (B : Bank #ℓ) : Set where
+  constructor nomuts
+  field
+    vals-no-muts : All NotMut (val-loans B)
+    static-no-mut : NotMut (static-loan B)
+
 -- A predicate for a vector of loans checking whether the most recent loan was immutable
 -- (i.e. the path is frozen). Also true if no loans are given out.
 data MostRecentBorrowImm : ∀ {#ℓ} → Vec Loan #ℓ → Set where
@@ -83,6 +89,6 @@ record Readable {#ℓ : ℕ} (B : Bank #ℓ) : Set where
     static-not-mut : NotMut (static-loan B)
 
 -- Borrow a path for a given lifetime and mutability (write that mutability into the lifetime slot)
-borrow : ∀ {#ℓ} → Bank #ℓ → Life #ℓ → Mut → Bank #ℓ
-borrow (bank val-loans _) static μ = bank val-loans (loan μ)
-borrow (bank val-loans static-loan) (val ℓ) μ = bank (set val-loans ℓ (loan μ)) static-loan
+make-loan : ∀ {#ℓ} → Bank #ℓ → Life #ℓ → Mut → Bank #ℓ
+make-loan (bank val-loans _) static μ = bank val-loans (loan μ)
+make-loan (bank val-loans static-loan) (val ℓ) μ = bank (set val-loans ℓ (loan μ)) static-loan
