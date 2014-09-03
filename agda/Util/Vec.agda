@@ -116,12 +116,12 @@ x ∈? (y ∷ xs) | no _ | yes pf = yes (S pf)
 x ∈? (y ∷ xs) | no ¬eq | no ¬rec = no (λ { (Z h) → ¬eq h
                                          ; (S h) → ¬rec h})
 
-uniqcons : ∀ {A n} {{EqA : Eq A}} → A → Vec A n → Σ ℕ (Vec A)
+uniqcons : ∀ {A n} {{EqA : Eq A}} → A → Vec A n → Σ ℕ ** (Vec A)
 uniqcons x xs with x ∈? xs
 uniqcons x xs | yes pf = _ , xs
 uniqcons x xs | no ¬pf = S _ , (x ∷ xs)
 
-_∪_ : ∀ {A n m} {{EqA : Eq A}} → Vec A n → Vec A m → Σ ℕ (Vec A)
+_∪_ : ∀ {A n m} {{EqA : Eq A}} → Vec A n → Vec A m → Σ ℕ ** (Vec A)
 [] ∪ ys = _ , ys
 (x ∷ xs) ∪ ys with xs ∪ ys
 (x ∷ xs) ∪ ys | _ , xys = uniqcons x xys 
