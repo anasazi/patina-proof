@@ -58,8 +58,11 @@ EqType : ∀ {#ℓ} → Eq (Type #ℓ)
 EqType = record { _==_ = _=type=_ }
 
 -- A context is a vector of types (variables -> types)
-Context : ℕ → ℕ → Set
-Context #ℓ #x = Vec (Type #ℓ) #x
+Cxt : ℕ → ℕ → Set
+Cxt #ℓ #x = Vec (Type #ℓ) #x
+
+RCxt : ℕ → ℕ → ℕ → Set
+RCxt #ℓ #x #a = Cxt #ℓ #x × Cxt #ℓ #a
 
 -- upshift and downshift for the indicies of types
 ↑#ℓ-τ : ∀ {#ℓ} → ℕ → Type #ℓ → Type (S #ℓ)
@@ -175,3 +178,9 @@ drop+¬drop≡⊤ (opt τ) | inr ¬drop = inr (opt ¬drop)
 -- nicer name for the above proof
 _Drop? : ∀ {#ℓ} → (τ : Type #ℓ) → τ Drop + τ ¬Drop
 _Drop? τ = drop+¬drop≡⊤ τ
+
+data _bound-by_ {#ℓ} : Type #ℓ → Life #ℓ → Set where
+  int : ∀ {ℓ} → int bound-by ℓ
+  ~ : ∀ {τ ℓ} → τ bound-by ℓ → ~ τ bound-by ℓ
+  & : ∀ {ℓ′ μ τ ℓ} → ℓ :<: ℓ′ → τ bound-by ℓ → & ℓ′ μ τ bound-by ℓ
+  opt : ∀ {τ ℓ} → τ bound-by ℓ → opt τ bound-by ℓ
