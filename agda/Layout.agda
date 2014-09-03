@@ -1,6 +1,5 @@
 open import Common
 open import Route
-open import Shape
 open import Type
 {-
 The representation of heap in the Redex Patina model (a mapping from address to values)
@@ -53,18 +52,11 @@ data ↓#a-l {#x #a} : ℕ → Layout #x (S #a) → Layout #x #a → Set where
   ptr : ∀ {c r r′} → mlift (↓#a-r c) r r′ → ↓#a-l c (ptr r) (ptr r′)
   rec : ∀ {n c ls ls′} → All2 (↓#a-l c) {n} ls ls′ → ↓#a-l c (rec ls) (rec ls′)
 
-  {-
 data void-layout {#x #a #ℓ} : Type #ℓ → Layout #x #a → Set where
   int : void-layout int (int none)
-  ~ : ∀ {τ} → void-layout (~ τ) (ptr none)
-  & : ∀ {ℓ μ τ} → void-layout (& ℓ μ τ) (ptr none)
+  ~⊥ : ∀ {τ} → void-layout (~ τ) (ptr none)
+  &⊥ : ∀ {ℓ μ τ} → void-layout (& ℓ μ τ) (ptr none)
   opt : ∀ {τ l} → void-layout τ l → void-layout (opt τ) (rec ([ int none ,, l ]))
-  -}
-void-layout : ∀ {#x #a #ℓ} → Type #ℓ → Layout #x #a
-void-layout int = int none
-void-layout (~ τ) = ptr none
-void-layout (& ℓ μ τ) = ptr none
-void-layout (opt τ) = rec ([ int none ,, void-layout τ ])
 
 Stack : ℕ → ℕ → Set
 Stack #x #a = Vec (Layout #x #a) #x
@@ -78,7 +70,6 @@ Mem #x #a = Stack #x #a × Heap #x #a
 data _⊢_⇒_ {#x #a} : Mem #x #a → Route #x #a → Layout #x #a → Set where
   stack : ∀ {S H x} → (S , H) ⊢ stack x ⇒ (S ! x)
   heap : ∀ {S H a} → (S , H) ⊢ heap a ⇒ (H ! a)
-  * : ∀ {M r r′ l} → M ⊢ r ⇒ ptr (just r′) → M ⊢ r′ ⇒ l → M ⊢ * r ⇒ l
   ∙ : ∀ {M r n f ls} → M ⊢ r ⇒ rec ls → M ⊢ < n > r ∙ f ⇒ (ls ! f)
 
 -- Writing memory (given a heap, a route [address], and a layout [value], produce a new heap)
@@ -86,7 +77,6 @@ data _⊢_⇒_ {#x #a} : Mem #x #a → Route #x #a → Layout #x #a → Set wher
 data _⊢_≔_⇒_ {#x #a} : Mem #x #a → Route #x #a → Layout #x #a → Mem #x #a → Set where
   stack : ∀ {S H x l} → (S , H) ⊢ stack x ≔ l ⇒ (set S x l , H)
   heap : ∀ {S H a l} → (S , H) ⊢ heap a ≔ l ⇒ (S , set H a l)
-  * : ∀ {M r r′ l M′} → M ⊢ r ⇒ ptr (just r′) → M ⊢ r′ ≔ l ⇒ M′ → M ⊢ * r ≔ l ⇒ M′
   ∙ : ∀ {M r n f ls l M′} → M ⊢ r ⇒ rec ls → M ⊢ r ≔ rec (set ls f l) ⇒ M′ → M ⊢ < n > r ∙ f ≔ l ⇒ M′
 
 -- Moving read
@@ -95,10 +85,11 @@ data _⊢_∶_⇒_,_ {#x #a #ℓ} : Mem #x #a → Route #x #a → Type #ℓ → 
        → τ Copy
        → M ⊢ r ⇒ l
        → M ⊢ r ∶ τ ⇒ l , M
-  move : ∀ {M r τ l M′}
+  move : ∀ {M r τ l l′ M′}
        → τ Affine
        → M ⊢ r ⇒ l
-       → M ⊢ r ≔ void-layout τ ⇒ M′
+       → void-layout τ l′
+       → M ⊢ r ≔ l′ ⇒ M′
        → M ⊢ r ∶ τ ⇒ l , M′
 
 test-moving-read-1 : (([ int (just 1) ]) , [])
@@ -108,16 +99,40 @@ test-moving-read-1 = copy int stack
 test-moving-read-2 : (([ ptr (just (heap fZ)) ]) , ([ int none ]))
                    ⊢ stack fZ ∶ ~ {0} int ⇒ ptr (just (heap fZ))
                    , (([ ptr none ]) , ([ int none ]))
-test-moving-read-2 = move ~Aff stack stack
+test-moving-read-2 = move ~Aff stack ~⊥ stack
 
--- Memcopy (given a heap, a source route, and a destination route, produce a new heap)
--- Note that we do not need to specify the size. We copy the whole of whatever we point to.
-_⊢_to_⇒_ : ∀ {#x #a} → Mem #x #a → Route #x #a → Route #x #a → Mem #x #a → Set
-M ⊢ src to dst ⇒ M′ = Σ[ l ∈ Layout _ _ ] M ⊢ src ⇒ l × M ⊢ dst ≔ l ⇒ M′
+{-
+data _,_⊢_∶_rok {#x #a #ℓ} (Γ : Context #ℓ #x) (M : Mem #x #a) : Route #x #a → Type #ℓ → Set
+data _,_⊢_∶_lok {#x #a #ℓ} (Γ : Context #ℓ #x) (M : Mem #x #a) : Layout #x #a → Type #ℓ → Set
+
+data _,_⊢_∶_rok {#x #a #ℓ} (Γ : Context #ℓ #x) (M : Mem #x #a) where
+  stack : ∀ {x} → Γ , M ⊢ stack x ∶ Γ ! x rok
+  heap : ∀ {a τ} → Γ , M ⊢ snd M ! a ∶ τ lok → Γ , M ⊢ heap a ∶ τ rok
+  disc : ∀ {r τ} → Γ , M ⊢ r ∶ opt τ rok → Γ , M ⊢ < 2 > r ∙ fin 0 ∶ int rok
+  pay : ∀ {r τ} → Γ , M ⊢ r ∶ opt τ rok → Γ , M ⊢ < 2 > r ∙ fin 1 ∶ τ rok
+
+data _,_⊢_∶_lok {#x #a #ℓ} (Γ : Context #ℓ #x) (M : Mem #x #a) where
+  int : ∀ {n?} → Γ , M ⊢ int n? ∶ int lok
+  ptr~ : ∀ {r τ}
+       → Γ , M ⊢ r ∶ τ rok
+       → Γ , M ⊢ ptr (just r) ∶ ~ τ lok
+  ⊥~ : ∀ {τ} → Γ , M ⊢ ptr none ∶ ~ τ lok
+  ptr& : ∀ {r ℓ μ τ}
+       → Γ , M ⊢ r ∶ τ rok
+       → Γ , M ⊢ ptr (just r) ∶ & ℓ μ τ lok
+  ⊥& : ∀ {ℓ μ τ} → Γ , M ⊢ ptr none ∶ & ℓ μ τ lok
+  opt : ∀ {τ d p}
+      → Γ , M ⊢ d ∶ int lok
+      → Γ , M ⊢ p ∶ τ lok
+      → Γ , M ⊢ rec ([ d ,, p ]) ∶ opt τ lok
+
+_⊢_mem-ok : ∀ {#x #a #ℓ} → Context #ℓ #x → Mem #x #a → Set
+Γ ⊢ M mem-ok = All2 (λ l τ → Γ , M ⊢ l ∶ τ lok) (fst M) Γ
+-}
 
 -- Typing for layouts
-data _,_⊢_∶_layout {#x #a #ℓ} (Γ : Context #ℓ #x)
-                              (Σ : Context #ℓ #a) : Layout #x #a → Type #ℓ → Set where
+data _,_⊢_∶_layout {#x #a #ℓ} (Γ : Cxt #ℓ #x)
+                              (Σ : Cxt #ℓ #a) : Layout #x #a → Type #ℓ → Set where
   -- Integer slots can only be integers
   int : ∀ {n?} → Γ , Σ ⊢ int n? ∶ int layout
   -- A pointer slot can be either kind of pointer (~ or &)
@@ -131,7 +146,7 @@ data _,_⊢_∶_layout {#x #a #ℓ} (Γ : Context #ℓ #x)
   opt : ∀ {τ d p} → Γ , Σ ⊢ d ∶ int layout → Γ , Σ ⊢ p ∶ τ layout
       → Γ , Σ ⊢ rec ([ d ,, p ]) ∶ opt τ layout
 
-_,_⊢_mem : ∀ {#x #a #ℓ} → Context #ℓ #x → Context #ℓ #a → Mem #x #a → Set
+_,_⊢_mem : ∀ {#x #a #ℓ} → Cxt #ℓ #x → Cxt #ℓ #a → Mem #x #a → Set
 Γ , Σ ⊢ St , H mem = All2 (λ l τ → Γ , Σ ⊢ l ∶ τ layout) St Γ
                    × All2 (λ l τ → Γ , Σ ⊢ l ∶ τ layout) H Σ
 
@@ -143,10 +158,6 @@ read-preservation : ∀ {#x #a #ℓ r l Γ Σ} {M : Mem #x #a} {τ : Type #ℓ}
                   → Γ , Σ ⊢ l ∶ τ layout
 read-preservation (⊢S , ⊢H) (stack {x}) stack = ⊢S All2! x
 read-preservation (⊢S , ⊢H) (heap {a}) heap = ⊢H All2! a
-read-preservation ⊢M (*~ r∶~τ) (* r⇒r′ r′⇒l) with read-preservation ⊢M r∶~τ r⇒r′
-... | ptr~ r′∶τ = read-preservation ⊢M r′∶τ r′⇒l
-read-preservation ⊢M (*& r∶&τ) (* r⇒r′ r′⇒l) with read-preservation ⊢M r∶&τ r⇒r′
-... | ptr& r′∶τ = read-preservation ⊢M r′∶τ r′⇒l
 read-preservation ⊢M (disc r∶opt-τ) (∙ r⇒l) with read-preservation ⊢M r∶opt-τ r⇒l
 ... | opt ∙0∶int ∙1∶τ = ∙0∶int
 read-preservation ⊢M (pay r∶opt-τ) (∙ r⇒l) with read-preservation ⊢M r∶opt-τ r⇒l
@@ -161,10 +172,6 @@ write-preservation : ∀ {#x #a #ℓ r l Γ Σ} {M M′ : Mem #x #a} {τ : Type 
                    → Γ , Σ ⊢ M′ mem
 write-preservation (⊢S , ⊢H) (stack {x}) l∶τ stack = All2set′ ⊢S x l∶τ , ⊢H
 write-preservation (⊢S , ⊢H) (heap {a}) l∶τ heap = ⊢S , All2set′ ⊢H a l∶τ
-write-preservation ⊢M (*~ r∶~τ) l∶τ (* r⇒r′ r′≔l) with read-preservation ⊢M r∶~τ r⇒r′
-... | ptr~ r′∶τ = write-preservation ⊢M r′∶τ l∶τ r′≔l
-write-preservation ⊢M (*& r∶&τ) l∶τ (* r⇒r′ r′≔l) with read-preservation ⊢M r∶&τ r⇒r′
-... | ptr& r′∶τ = write-preservation ⊢M r′∶τ l∶τ r′≔l
 write-preservation ⊢M (disc r∶opt-τ) l∶int (∙ r⇒ls r≔ls′) with read-preservation ⊢M r∶opt-τ r⇒ls
 ... | opt ∙0∶int ∙1∶τ = write-preservation ⊢M r∶opt-τ (opt l∶int ∙1∶τ) r≔ls′
 write-preservation ⊢M (pay r∶opt-τ) l∶τ (∙ r⇒ls r≔ls′) with read-preservation ⊢M r∶opt-τ r⇒ls
@@ -180,21 +187,6 @@ data _void {#x #a} : Layout #x #a → Set where
   ptr : ptr none void
   rec : ∀ {n} {ls : Vec (Layout #x #a) n} → All _void ls → rec ls void
 
--- -- Correspondence between a Shape and a Layout
-data _⊢_∶_rep {#ℓ #x #a} (M : Mem #x #a) : Layout #x #a → Shape #ℓ → Set where
-  int⊥ : M ⊢ int none ∶ int none rep
-  int : ∀ {n b} → M ⊢ int (just n) ∶ int (just b) rep
-  ~⊥ : M ⊢ ptr none ∶ ~ none rep
-  ~ : ∀ {r δ b l} → M ⊢ r ⇒ l → M ⊢ l ∶ δ rep → M ⊢ ptr (just r) ∶ ~ (just (b , δ)) rep
-  &⊥ : M ⊢ ptr none ∶ & none rep
-  & : ∀ {r b l} → M ⊢ r ⇒ l → M ⊢ l init → M ⊢ ptr (just r) ∶ & (just b) rep
-  opt⊥ : ∀ {l} → l void → M ⊢ rec ([ int none ,, l ]) ∶ opt none rep
-  none : ∀ {b l} → M ⊢ l init → M ⊢ rec ([ int (just 0) ,, l ]) ∶ opt (just b) rep
-  some : ∀ {b l} → M ⊢ l init → M ⊢ rec ([ int (just 1) ,, l ]) ∶ opt (just b) rep
-
-_⊢_mem-state : ∀ {#ℓ #x #a} → State #ℓ #x → Mem #x #a → Set
-Δ ⊢ M mem-state = All2 (λ δ l → M ⊢ l ∶ δ rep) Δ (fst M)
-
 data _⊢_reaches_layout {#x #a} (M : Mem #x #a) : Layout #x #a → Fin #a → Set
 data _⊢_reaches_route {#x #a} (M : Mem #x #a) : Route #x #a → Fin #a → Set
 
@@ -206,7 +198,6 @@ data _⊢_reaches_route {#x #a} (M : Mem #x #a) where
   refl : ∀ {a} → M ⊢ heap a reaches a route
   stack : ∀ {x a} → M ⊢ fst M ! x reaches a layout → M ⊢ stack x reaches a route
   heap : ∀ {a′ a} → M ⊢ snd M ! a′ reaches a layout → M ⊢ heap a′ reaches a route
-  * : ∀ {r a} → M ⊢ r reaches a route → M ⊢ * r reaches a route
   ∙ : ∀ {n r f a} → M ⊢ r reaches a route → M ⊢ < n > r ∙ f reaches a route
 
 _⊢_reachable : ∀ {#x #a} → Mem #x #a → Fin #a → Set
@@ -217,9 +208,9 @@ NoGarbage {#a} M = All (λ a → M ⊢ a reachable) (range′ #a)
 
 private
   M : Mem 4 4
-  M = ([ int (just 1) ,, ptr (just (heap fZ)) ,, int none
-      ,, rec ([ int none ,, ptr (just (heap (fin 2))) ]) ])
-    , ([ ptr (just (* (stack (fin 2)))) ,, int (just 2) ,, ptr (just (heap (fin 1))) ,, int none ])
+  M = ([ int (just 1) ,, ptr (just (heap fZ))
+      ,, int none ,, rec ([ int none ,, ptr (just (heap (fin 2))) ]) ])
+    , ([ ptr (just (stack (fin 2))) ,, int (just 2) ,, ptr (just (heap (fin 1))) ,, int none ])
 
   M-0 : M ⊢ fin 0 reachable
   M-0 = S (Z (ptr refl))
@@ -229,7 +220,7 @@ private
   M-2 = S (S (S (Z (rec (S (Z (ptr refl)))))))
   M-3 : ¬ (M ⊢ fin 3 reachable)
   M-3 (Z ())
-  M-3 (S (Z (ptr (heap (ptr (* (stack ())))))))
+  M-3 (S (Z (ptr (heap (ptr (stack ()))))))
   M-3 (S (S (Z ())))
   M-3 (S (S (S (Z (rec (Z ()))))))
   M-3 (S (S (S (Z (rec (S (Z (ptr (heap (ptr (heap ())))))))))))
@@ -238,20 +229,21 @@ private
 
   M-NG : ¬ (NoGarbage M)
   M-NG (_ ∷ _ ∷ _ ∷ Z () ∷ [])
-  M-NG (_ ∷ _ ∷ _ ∷ S (Z (ptr (heap (ptr (* (stack ())))))) ∷ [])
+  M-NG (_ ∷ _ ∷ _ ∷ S (Z (ptr (heap (ptr (stack ()))))) ∷ [])
   M-NG (_ ∷ _ ∷ _ ∷ S (S (Z ())) ∷ [])
   M-NG (_ ∷ _ ∷ _ ∷ S (S (S (Z (rec (Z ()))))) ∷ [])
   M-NG (_ ∷ _ ∷ _ ∷ S (S (S (Z (rec (S (Z (ptr (heap (ptr (heap ())))))))))) ∷ [])
   M-NG (_ ∷ _ ∷ _ ∷ S (S (S (Z (rec (S (S ())))))) ∷ [])
   M-NG (_ ∷ _ ∷ _ ∷ S (S (S (S ()))) ∷ [])
-
+  
   M′ : Mem 1 2
-  M′ = ([ ptr (just (* (heap fZ))) ]) , ([ ptr (just (heap (fin 1))) ,, int none ])
+  M′ = ([ ptr (just (heap fZ)) ])
+     , ([ ptr (just (heap (fin 1))) ,, int none ])
 
   M′-0 : M′ ⊢ fin 0 reachable
-  M′-0 = Z (ptr (* refl))
+  M′-0 = Z (ptr refl)
   M′-1 : M′ ⊢ fin 1 reachable
-  M′-1 = Z (ptr (* (heap (ptr refl))))
+  M′-1 = Z (ptr (heap (ptr refl)))
 
   M′-NG : NoGarbage M′
-  M′-NG = Z (ptr (* refl)) ∷ Z (ptr (* (heap (ptr refl)))) ∷ []
+  M′-NG = Z (ptr refl) ∷ Z (ptr (heap (ptr refl))) ∷ []
