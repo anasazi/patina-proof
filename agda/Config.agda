@@ -1,4 +1,5 @@
 open import Common
+open import Life
 open import Type
 open import Layout
 open import Shape
@@ -10,28 +11,32 @@ record Config {#f} (F : Funcs #f) : Set where
   constructor config
   field
     {#x #a #ℓ} : ℕ
-    Γ : Context #ℓ #x
+    Γ : Cxt #ℓ #x
     M : Mem #x #a
     t : Trace #f #x #ℓ
 
 data Finished {#f} {F : Funcs #f} : Config F → Set where
-  finished : ∀ {#x #a #ℓ} {Γ : Context #ℓ #x} {M : Mem #x #a} → Finished (config Γ M ∅)
+  finished : ∀ {#x #a #ℓ} {Γ : Cxt #ℓ #x} {M : Mem #x #a} → Finished (config Γ M ∅)
 
 record cok {#f} (F : Funcs #f) (C : Config F) : Set where
   constructor config
   field
-    -- TODO proof that F is ok
+    F-ok : All (fnok F) F
+    {L} : Lifes (Config.#ℓ C) (Config.#x C)
     {Δ} : State (Config.#ℓ C) (Config.#x C)
+    {T} : Cxt (Config.#ℓ C) (Config.#a C)
     Γ⊢Δ : Config.Γ C ⊢ Δ state
     Δ⊢M : Δ ⊢ Config.M C mem-state
+    Γ,T⊢M : Config.Γ C , T ⊢ Config.M C mem
     NG : NoGarbage (Config.M C)
-    ⊢t : tok F {#ℓ′ = 0} (Config.Γ C) Δ (Config.t C) []
+    ⊢t : tok F {#ℓ′ = 0} (Config.Γ C) L Δ (Config.t C) []
 
 record cev {#f} (F : Funcs #f) (C₁ C₂ : Config F) : Set where
   constructor config
   field
     ev : tev F (Config.Γ C₁) (Config.M C₁) (Config.t C₁) (Config.Γ C₂) (Config.M C₂) (Config.t C₂)
 
+    {-
 progress : ∀ {#f} (F : Funcs #f) (C : Config F) → cok F C
          → Finished C + (Σ[ C′ ∈ Config F ] cev F C C′)
 progress F (config .[] (.[] , H) .∅) (config [] [] [] ∅) = inl finished
@@ -47,3 +52,4 @@ preservation F (config Γ M .(skip end t′)) (config Γ′ .M t′) Cok (config
 preservation F (config Γ M ._) (config Γ′ M′ t′) Cok (config (⟶>> sok)) = {!!}
 preservation F (config Γ M ._) (config Γ′ M′ t′) Cok (config (⟶pop sok)) = {!!}
 preservation F (config Γ M ._) (config Γ′ M′ t′) Cok (config (⟶end sok)) = {!!}
+-}
