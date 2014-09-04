@@ -1,3 +1,26 @@
+9-4-14
+
+I realized that Routes shouldn't have a pointer dereference constructor.
+(Routes are supposed to be addresses, so it doesn't really make sense).
+This leaves just stack and heap allocations and projections from other Routes.
+That is, top level addresses of allocations and valid address arithmetic within allocations.
+This slightly changed path evaluation (it actually does pointer dereferencing now).
+
+Adding borrow creation to the set of expressions was fairly straightforward.
+The various path-{freezable, unique, valid}-for checks where easily ported.
+Path unrestricted and unencumbered checks were more troublesome, but I had
+already figured out how to avoid proofs of negatives there.
+
+Borrow checking requires adding the variable-lifetime map, which revealed
+a problem with statements. Seperating region creation and stack variable creation
+turns out to be unworkable because it makes it impossible to list the lifetime
+of the new variable in the variable-lifetime map. This is easily solved by
+simply merging the two. Multiple variables with the same lifetime can be
+represented as a fields of a struct if necessary. This change causes the #x and
+#ℓ indicies to always be equal and the lifetime of the x-th variable to simply
+be (val x). Thus, we may be able to remove the #ℓ index and eliminate the
+variable-lifetime map.
+
 8-28-14
 
 First entry, so it's a very long one.
