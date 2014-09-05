@@ -37,49 +37,51 @@ module Life where
 -- + the number of lifetime values (#ℓ)
 -- + the number of lifetime variables (#Ł)
 -- which encodes the lifetime relation.
-data Life (#ℓ : ℕ) : Set where
+data Life (#x : ℕ) : Set where
   -- A lifetime variabel is identified by some element of the finite set of size #Ł
   --var : Fin #Ł → Life #ℓ
   -- The static lifetime is always in scope
-  static : Life #ℓ
+  static : Life #x
   -- A lifetime value is identified by some element of the finite set of size #ℓ
-  val : Fin #ℓ → Life #ℓ
+  val : Fin #x → Life #x
 
 private
-  val-inj : ∀ {#ℓ} {i j : Fin #ℓ} → val i ≡ val j → i ≡ j
+  val-inj : ∀ {#x} {i j : Fin #x} → val i ≡ val j → i ≡ j
   val-inj refl = refl
 
-  _=life=_ : ∀ {#ℓ} → (ℓ₁ ℓ₂ : Life #ℓ) → Dec (ℓ₁ ≡ ℓ₂)
+  _=life=_ : ∀ {#x} → (ℓ₁ ℓ₂ : Life #x) → Dec (ℓ₁ ≡ ℓ₂)
   static =life= static = yes refl
-  static =life= val ℓ₂ = no (λ ())
-  val ℓ₁ =life= static = no (λ ())
-  val ℓ₁ =life= val ℓ₂ with ℓ₁ == ℓ₂
-  val ℓ₁ =life= val .ℓ₁ | yes refl = yes refl
-  val ℓ₁ =life= val ℓ₂ | no neq = no (neq ∘ val-inj)
+  static =life= val x₂ = no (λ ())
+  val x₁ =life= static = no (λ ())
+  val x₁ =life= val x₂ with x₁ == x₂
+  val x₁ =life= val .x₁ | yes refl = yes refl
+  val x₁ =life= val x₂ | no neq = no (neq ∘ val-inj)
 
-EqLife : ∀ {#ℓ} → Eq (Life #ℓ)
+EqLife : ∀ {#x} → Eq (Life #x)
 EqLife = record { _==_ = _=life=_ }
 
 -- upshifting and downshifting for lifetimes
-↑#ℓ-ℓ : ∀ {#ℓ} → ℕ → Life #ℓ → Life (S #ℓ)
-↑#ℓ-ℓ c static = static
-↑#ℓ-ℓ c (val ℓ) = val (↑ c ℓ)
+↑#x-ℓ : ∀ {#x} → ℕ → Life #x → Life (S #x)
+↑#x-ℓ c static = static
+↑#x-ℓ c (val x) = val (↑ c x)
 
-data ↓#ℓ-ℓ {#ℓ} : ℕ → Life (S #ℓ) → Life #ℓ → Set where
-  static : ∀ {c} → ↓#ℓ-ℓ c static static
-  val : ∀ {c ℓ ℓ′} → ↓ c ℓ ℓ′ → ↓#ℓ-ℓ c (val ℓ) (val ℓ′)
+data ↓#x-ℓ {#x} : ℕ → Life (S #x) → Life #x → Set where
+  static : ∀ {c} → ↓#x-ℓ c static static
+  val : ∀ {c x x′} → ↓ c x x′ → ↓#x-ℓ c (val x) (val x′)
 
+  {-
 Lifes : ℕ → ℕ → Set
 Lifes #ℓ #x = Vec (Life #ℓ) #x
+-}
 
 -- The ordering relationship on lifetimes.
-data _:<:_ {#ℓ : ℕ} : Life #ℓ → Life #ℓ → Set where
+data _:<:_ {#x : ℕ} : Life #x → Life #x → Set where
   -- The relationship is reflexive for all three constructors
   --var-refl : ∀ {Ł} → #ℓ , #Ł ∣ var Ł <: var Ł
   static-refl : static :<: static
   -- Values are less than both static and any variable
   --val-var : ∀ {ℓ Ł} → #ℓ , #Ł ∣ val ℓ <: var Ł
-  val-static : ∀ {ℓ} → val ℓ :<: static
+  val-static : ∀ {x} → val x :<: static
   -- A lower (newer) value is less than a larger (older) value
   val-val : ∀ {ℓ₁ ℓ₂} → asℕ ℓ₁ ≤ asℕ ℓ₂ → val ℓ₁ :<: val ℓ₂
 

@@ -17,7 +17,7 @@ data ↓#x-p {#x} : ℕ → Path (S #x) → Path #x → Set where
   var : ∀ {c x x′} → ↓ c x x′ → ↓#x-p c (var x) (var x′)
   * : ∀ {c p p′} → ↓#x-p c p p′ → ↓#x-p c (* p) (* p′)
 
-data _⊢_∶_path {#x #ℓ} (Γ : Cxt #ℓ #x) : Path #x → Type #ℓ → Set where
+data _⊢_∶_path {#x} (Γ : Cxt #x) : Path #x → Type #x → Set where
   var : ∀ {x} → Γ ⊢ var x ∶ (Γ ! x) path
   *~ : ∀ {p τ} → Γ ⊢ p ∶ ~ τ path → Γ ⊢ * p ∶ τ path
   *& : ∀ {p ℓ μ τ} → Γ ⊢ p ∶ & ℓ μ τ path → Γ ⊢ * p ∶ τ path
@@ -27,11 +27,11 @@ data _⊢_⟶_ {#x #a} (M : Mem #x #a) : Path #x → Route #x #a → Set where
   var : ∀ {x} → M ⊢ var x ⟶ stack x
   * : ∀ {p r r′} → M ⊢ p ⟶ r → M ⊢ r ⇒ ptr (just r′) → M ⊢ * p ⟶ r′
 
-data _⊢_owned {#x #ℓ} (Γ : Cxt #ℓ #x) : Path #x → Set where
+data _⊢_owned {#x} (Γ : Cxt #x) : Path #x → Set where
   var : ∀ {x} → Γ ⊢ var x owned
   *~ : ∀ {p τ} → Γ ⊢ p ∶ ~ τ path → Γ ⊢ * p owned
 
-data _⊢_freezable-for_ {#x #ℓ} (Γ : Cxt #ℓ #x) : Path #x → Life #ℓ → Set where
+data _⊢_freezable-for_ {#x} (Γ : Cxt #x) : Path #x → Life #x → Set where
   var : ∀ {x ℓ} → Γ ⊢ var x freezable-for ℓ
   *~ : ∀ {p τ ℓ}
      → Γ ⊢ p ∶ ~ τ path
@@ -47,7 +47,7 @@ data _⊢_freezable-for_ {#x #ℓ} (Γ : Cxt #ℓ #x) : Path #x → Life #ℓ �
         → ℓ :<: ℓ′
         → Γ ⊢ * p freezable-for ℓ
 
-data _⊢_unique-for_ {#x #ℓ} (Γ : Cxt #ℓ #x) : Path #x → Life #ℓ → Set where
+data _⊢_unique-for_ {#x} (Γ : Cxt #x) : Path #x → Life #x → Set where
   var : ∀ {x ℓ} → Γ ⊢ var x unique-for ℓ
   *~ : ∀ {p τ ℓ}
      → Γ ⊢ p ∶ ~ τ path
@@ -59,25 +59,24 @@ data _⊢_unique-for_ {#x #ℓ} (Γ : Cxt #ℓ #x) : Path #x → Life #ℓ → S
         → Γ ⊢ p unique-for ℓ
         → Γ ⊢ * p unique-for ℓ
 
-data _,_⊢_valid-for_ {#x #ℓ} (Γ : Cxt #ℓ #x) (L : Lifes #ℓ #x) : Path #x → Life #ℓ → Set where
+data _⊢_valid-for_ {#x} (Γ : Cxt #x) : Path #x → Life #x → Set where
   var : ∀ {x ℓ}
-      → ℓ :<: (L ! x)
-      → Γ , L ⊢ var x valid-for ℓ
+      → ℓ :<: val x
+      → Γ ⊢ var x valid-for ℓ
   *~ : ∀ {p τ ℓ}
      → Γ ⊢ p ∶ ~ τ path
-     → Γ , L ⊢ p valid-for ℓ
-     → Γ , L ⊢ * p valid-for ℓ
+     → Γ ⊢ p valid-for ℓ
+     → Γ ⊢ * p valid-for ℓ
   & : ∀ {p ℓ′ μ τ ℓ}
     → Γ ⊢ p ∶ & ℓ′ μ τ path
     → ℓ :<: ℓ′
-    → Γ , L ⊢ * p valid-for ℓ
+    → Γ ⊢ * p valid-for ℓ
 
-record _,_⊢_outlives_ {#x #ℓ} (Γ : Cxt #ℓ #x) (L : Vec (Life #ℓ) #x)
-                              (p : Path #x) (ℓ : Life #ℓ) : Set where
+record _⊢_outlives_ {#x} (Γ : Cxt #x) (p : Path #x) (ℓ : Life #x) : Set where
   constructor outlives
   field
-    valid : Γ , L ⊢ p valid-for ℓ
-    {τ} : Type #ℓ
+    valid : Γ ⊢ p valid-for ℓ
+    {τ} : Type #x
     path : Γ ⊢ p ∶ τ path
     bound : τ bound-by ℓ
 

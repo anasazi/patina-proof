@@ -8,155 +8,140 @@ open import Layout
 
 module Stmt where
 
-data Stmt (#f : ℕ) : (#x #ℓ : ℕ) → Set
+data Stmt (#f : ℕ) : (#x : ℕ) → Set
 
 infixr 5 _>>_
-data Seq (#f #x #ℓ : ℕ) : Set where
-  ∅ : Seq #f #x #ℓ
-  _>>_ : Stmt #f #x #ℓ → Seq #f #x #ℓ → Seq #f #x #ℓ
+data Seq (#f #x : ℕ) : Set where
+  ∅ : Seq #f #x
+  _>>_ : Stmt #f #x → Seq #f #x → Seq #f #x
 
 data Stmt (#f : ℕ) where
-  skip : ∀ {#x #ℓ} → Stmt #f #x #ℓ
-  _←_ : ∀ {#x #ℓ} → Path #x → Expr #x #ℓ → Stmt #f #x #ℓ
-  free : ∀ {#x #ℓ} → Path #x → Stmt #f #x #ℓ
-  push : ∀ {#x #ℓ} → Type (S #ℓ) → Seq #f (S #x) (S #ℓ) → Stmt #f #x #ℓ
-  call : ∀ {#x #ℓ} → Fin #f → Path #x → Stmt #f #x #ℓ
-  match : ∀ {#x #ℓ} → Path #x → Seq #f (S #x) (S #ℓ) → Seq #f #x #ℓ → Stmt #f #x #ℓ
+  skip : ∀ {#x} → Stmt #f #x
+  _←_ : ∀ {#x} → Path #x → Expr #x → Stmt #f #x
+  free : ∀ {#x} → Path #x → Stmt #f #x
+  push : ∀ {#x} → Type (S #x) → Seq #f (S #x) → Stmt #f #x
+  call : ∀ {#x} → Fin #f → Path #x → Stmt #f #x
+  match : ∀ {#x} → Path #x → Seq #f (S #x) → Seq #f #x → Stmt #f #x
 
 record Func (#f : ℕ) : Set where
   constructor fn
   field
     arg : Type 1
-    body : Seq #f 1 1
+    body : Seq #f 1
 open Func
 
-↑#x-s : ∀ {#f #x #ℓ} → ℕ → Stmt #f #x #ℓ → Stmt #f (S #x) #ℓ
+↑#x-s : ∀ {#f #x} → ℕ → Stmt #f #x → Stmt #f (S #x)
 
-↑#x-sq : ∀ {#f #x #ℓ} → ℕ → Seq #f #x #ℓ → Seq #f (S #x) #ℓ
+↑#x-sq : ∀ {#f #x} → ℕ → Seq #f #x → Seq #f (S #x)
 ↑#x-sq c ∅ = ∅
 ↑#x-sq c (s >> sq) = ↑#x-s c s >> ↑#x-sq c sq
 
 ↑#x-s c skip = skip
 ↑#x-s c (p ← e) = ↑#x-p c p ← ↑#x-e c e
 ↑#x-s c (free p) = free (↑#x-p c p)
-↑#x-s c (push τ sq) = push τ (↑#x-sq (S c) sq)
+↑#x-s c (push τ sq) = push (↑#x-τ (S c) τ) (↑#x-sq (S c) sq)
 ↑#x-s c (call f p) = call f (↑#x-p c p)
 ↑#x-s c (match p sqₛ sqₙ) = match (↑#x-p c p) (↑#x-sq (S c) sqₛ) (↑#x-sq c sqₙ)
 
-↑#ℓ-s : ∀ {#f #x #ℓ} → ℕ → Stmt #f #x #ℓ → Stmt #f #x (S #ℓ)
-
-↑#ℓ-sq : ∀ {#f #x #ℓ} → ℕ → Seq #f #x #ℓ → Seq #f #x (S #ℓ)
-↑#ℓ-sq c ∅ = ∅
-↑#ℓ-sq c (s >> sq) = ↑#ℓ-s c s >> ↑#ℓ-sq c sq
-
-↑#ℓ-s c skip = skip
-↑#ℓ-s c (p ← e) = p ← ↑#ℓ-e c e
-↑#ℓ-s c (free p) = free p
-↑#ℓ-s c (push τ sq) = push (↑#ℓ-τ (S c) τ) (↑#ℓ-sq (S c) sq)
-↑#ℓ-s c (call f p) = call f p
-↑#ℓ-s c (match p sqₛ sqₙ) = match p (↑#ℓ-sq (S c) sqₛ) (↑#ℓ-sq c sqₙ)
-
-conv-help : ∀ {#ℓ #x #f} → Type 1 → Path #x → Seq #f 1 1 → Stmt #f #x #ℓ
-conv-help {#ℓ} {#x} {#f} τ p sq = push τ′ (var fZ ← use (↑#x-p 0 p) >> sq′′)
-  where τ′ = ⇑′ Type ↑#ℓ-τ #ℓ 1 τ
-        sq′ = ⇑′ (Seq #f 1) ↑#ℓ-sq #ℓ 1 sq
-        sq′′ = ⇑′ (λ #x → Seq #f #x (S #ℓ)) ↑#x-sq #x 1 sq′
-
-conv : ∀ {#ℓ #x #f} → Func #f → Path #x → Stmt #f #x #ℓ
-conv f p = conv-help (arg f) p (body f)
+conv : ∀ {#x #f} → Func #f → Path #x → Stmt #f #x
+conv f p = push τ′ (var fZ ← use (↑#x-p 0 p) >> sq′)
+  where τ′ = ⇑′ Type ↑#x-τ _ 1 (arg f)
+        sq′ = ⇑′ (Seq _) ↑#x-sq _ 1 (body f)
 
 Funcs : ℕ → Set
 Funcs #f = Vec (Func #f) #f
 
-data stok {#f} (F : Funcs #f) : ∀ {#xᵢ #ℓᵢ #xₒ #ℓₒ} → Cxt #ℓᵢ #xᵢ → Lifes #ℓᵢ #xᵢ
-                              → State #ℓᵢ #xᵢ → Stmt #f #xᵢ #ℓᵢ → State #ℓₒ #xₒ → Set 
+data stok {#f} (F : Funcs #f) : ∀ {#xᵢ #xₒ} → Cxt #xᵢ → State #xᵢ → Stmt #f #xᵢ → State #xₒ → Set 
 
-data seqok {#f} (F : Funcs #f) {#x #ℓ}
-           (Γ : Cxt #ℓ #x) (L : Lifes #ℓ #x) (Δ : State #ℓ #x)
-           : Seq #f #x #ℓ → State #ℓ #x → Set where
-  ∅ : seqok F Γ L Δ ∅ Δ
+data seqok {#f} (F : Funcs #f) {#x}
+           (Γ : Cxt #x) (Δ : State #x)
+           : Seq #f #x → State #x → Set where
+  ∅ : seqok F Γ Δ ∅ Δ
   _>>_ : ∀ {s sq Δ₁ Δ₂}
-       → stok F Γ L Δ s Δ₁
-       → seqok F Γ L Δ₁ sq Δ₂
-       → seqok F Γ L Δ (s >> sq) Δ₂
+       → stok F Γ Δ s Δ₁
+       → seqok F Γ Δ₁ sq Δ₂
+       → seqok F Γ Δ (s >> sq) Δ₂
 
 data stok {#f} (F : Funcs #f) where
-  skip : ∀ {#x #ℓ L Δ} {Γ : Cxt #ℓ #x} → stok F Γ L Δ skip Δ
-  ←ok : ∀ {#x #ℓ p e τₗ τᵣ L Δ₀ Δ₁ Δ₂} {Γ : Cxt #ℓ #x}
-      → Γ , L , Δ₀ ⊢ e ∶ τᵣ , Δ₁
+  skip : ∀ {#x Δ} {Γ : Cxt #x} → stok F Γ Δ skip Δ
+  ←ok : ∀ {#x p e τₗ τᵣ Δ₀ Δ₁ Δ₂} {Γ : Cxt #x}
+      → Γ , Δ₀ ⊢ e ∶ τᵣ , Δ₁
       → Γ , Δ₁ ⊢ p initable
       → Γ ⊢ p ∶ τₗ path
       → τᵣ <: τₗ
       → Γ , Δ₁ ⊢ p ⇒ Δ₂ init
-      → stok F Γ L Δ₀ (p ← e) Δ₂
-  free : ∀ {#x #ℓ p τ L Δ Δ′ δ} {Γ : Cxt #ℓ #x}
+      → stok F Γ Δ₀ (p ← e) Δ₂
+  free : ∀ {#x p τ Δ Δ′ δ} {Γ : Cxt #x}
        → Γ ⊢ p ∶ ~ τ path
        → Γ , Δ ⊢ * p ⇒ δ shape
        → τ ⊢ δ Dropped
        → Γ , Δ ⊢ p ⇒ Δ′ void
-       → stok F Γ L Δ (free p) Δ′
-  push : ∀ {#x #ℓ τ sq L Δ δ Δ′ ↓Δ′} {Γ : Cxt #ℓ #x}
-       → seqok F (τ ∷ map (↑#ℓ-τ 0) Γ) (val fZ ∷ map (↑#ℓ-ℓ 0) L)
-               (void-shape τ ∷ map (↑#ℓ-δ 0) Δ) sq (δ ∷ Δ′)
+       → stok F Γ Δ (free p) Δ′
+  push : ∀ {#x τ sq Δ δ Δ′ ↓Δ′} {Γ : Cxt #x}
+       → seqok F (τ ∷ map (↑#x-τ 0) Γ) (void-shape τ ∷ map (↑#x-δ 0) Δ) sq (δ ∷ Δ′)
        → τ ⊢ δ Dropped
-       → All2 (↓#ℓ-δ 0) Δ′ ↓Δ′
-       → stok F Γ L Δ (push τ sq) ↓Δ′
-  call : ∀ {#x #ℓ f p τ L Δ Δ′} {Γ : Cxt #ℓ #x}
+       → All2 (↓#x-δ 0) Δ′ ↓Δ′
+       → stok F Γ Δ (push τ sq) ↓Δ′
+  call : ∀ {#x f p τ Δ Δ′} {Γ : Cxt #x}
        → Γ , Δ ⊢ p ∶ τ ⇒ Δ′
-       → ↑#ℓ-τ 0 τ <: ⇑′ Type ↑#ℓ-τ #ℓ 1 (arg (F ! f))
-       → stok F Γ L Δ (call f p) Δ′
-  match : ∀ {#x #ℓ p τ sₛ sₙ L Δ₀ Δ₁ δ Δ₂ ↓Δ₂} {Γ : Cxt #ℓ #x}
+       → ↑#x-τ 0 τ <: ⇑′ Type ↑#x-τ #x 1 (arg (F ! f))
+       → stok F Γ Δ (call f p) Δ′
+  match : ∀ {#x p τ sₛ sₙ Δ₀ Δ₁ δ Δ₂ ↓Δ₂} {Γ : Cxt #x}
         → Γ , Δ₀ ⊢ p ∶ opt τ ⇒ Δ₁
-        → seqok F (map (↑#ℓ-τ 0) (τ ∷ Γ)) (val fZ ∷ map (↑#ℓ-ℓ 0) L)
-                (map (↑#ℓ-δ 0) (init-shape τ ∷ Δ₁)) sₛ (δ ∷ Δ₂)
-        → ↑#ℓ-τ 0 τ ⊢ δ Dropped
-        → seqok F Γ L Δ₁ sₙ ↓Δ₂
-        → All2 (↓#ℓ-δ 0) Δ₂ ↓Δ₂
-        → stok F Γ L Δ₀ (match p sₛ sₙ) ↓Δ₂
+        → seqok F (map (↑#x-τ 0) (τ ∷ Γ)) (map (↑#x-δ 0) (init-shape τ ∷ Δ₁)) sₛ (δ ∷ Δ₂)
+        → ↑#x-τ 0 τ ⊢ δ Dropped
+        → seqok F Γ Δ₁ sₙ ↓Δ₂
+        → All2 (↓#x-δ 0) Δ₂ ↓Δ₂
+        → stok F Γ Δ₀ (match p sₛ sₙ) ↓Δ₂
 
 record fnok {#f} (F : Funcs #f) (f : Func #f) : Set where
   constructor fn
   field
     {δ} : Shape 1
-    body-ok : seqok F ([ arg f ]) ([ val fZ ]) ([ init-shape (arg f) ]) (body f) ([ δ ])
+    body-ok : seqok F ([ arg f ]) ([ init-shape (arg f) ]) (body f) ([ δ ])
     cleans : arg f ⊢ δ Dropped
 
 module TestStmt where
   open import Loan
 
-  ok-1 : stok [] ([ int {0} ]) ([ static ]) ([ int (just (bank-def _)) ])
-              (push (~ int) ∅) ([ int {0} (just (bank-def _)) ])
+  ok-1 : stok [] ([ int ]) ([ int (just (bank-def _)) ])
+              (push (~ int) ∅) ([ int (just (bank-def _)) ])
   ok-1 = push ∅ ~-drop (int (just (refl , Z)) ∷ [])
-  ok-2 : ¬ (stok [] ([ int {0} ]) ([ static ]) ([ int (just (bank-def _)) ])
-                 (push (~ int) (var fZ ← new (var (fin 1)) >> ∅)) ([ int {0} (just (bank-def _)) ]))
+  ok-2 : ¬ (stok [] ([ int ]) ([ int (just (bank-def _)) ])
+                 (push (~ int) (var fZ ← new (var (fin 1)) >> ∅)) ([ int (just (bank-def _)) ]))
   ok-2 (push (←ok (new (copy _ _ _)) _ _ _ (init var ()) >> ∅) ~-drop _)
   ok-2 (push (←ok (new (move var () _ _)) _ _ _ _ >> ∅) ~-drop _)
-  ok-3 : stok [] ([ int {0} ]) ([ static ]) ([ int (just (bank-def _)) ])
+  ok-3 : stok [] ([ int ]) ([ int (just (bank-def _)) ])
               (push (~ int) (var fZ ← new (var (fin 1)) >> free (var fZ) >> ∅))
-              ([ int {0} (just (bank-def _)) ])
+              ([ int (just (bank-def _)) ])
   ok-3 = push (←ok (new (copy var int
                               (can-read (deep var int)
-                                        (read-unres var (int (readable (free ∷ []) free)))
-                                        (var (int (nomuts (free ∷ []) free))))))
+                                        (read-unres var (int (readable (free ∷ (free ∷ [])) free)))
+                                        (var (int (nomuts (free ∷ (free ∷ [])) free))))))
                    (initable var ~) var (~ int) (init var var)
             >> free var (*~ var) int (void var var)
-            >> ∅) ~-drop (int (just (refl , Z)) ∷ [])
-  ok-4 : stok [] ([ opt {0} int ,, int ]) ([ static ,, static ])
+            >> ∅)
+              ~-drop
+              (int (just (refl , Z)) ∷ [])
+  ok-4 : stok [] ([ opt int ,, int ])
               ([ opt (just (bank-def _)) ,, int none ])
               (match (var fZ) (var (fin 2) ← use (var fZ) >> ∅) (var (fin 1) ← int 0 >> ∅))
-              ([ opt (just (bank-def _)) ,, int {0} (just (bank-def _)) ])
-  ok-4 = match (copy var (opt int) (can-read (deep var opt)
-                                             (read-unres var (opt (readable [] free)))
-                                             (var (opt (nomuts [] free)))))
-               (←ok (use (copy var int (can-read (deep var int)
-                                                 (read-unres var (int (readable (free ∷ []) free)))
-                                                 (var (int (nomuts (free ∷ []) free))))))
+              ([ opt (just (bank-def _)) ,, int (just (bank-def _)) ])
+  ok-4 = match (copy var (opt int)
+                     (can-read (deep var opt)
+                               (read-unres var (opt (readable (free ∷ (free ∷ [])) free)))
+                               (var (opt (nomuts (free ∷ (free ∷ [])) free)))))
+               (←ok (use (copy var int
+                               (can-read
+                                 (deep var int)
+                                 (read-unres var (int (readable (free ∷ (free ∷ (free ∷ []))) free)))
+                                 (var (int (nomuts (free ∷ (free ∷ (free ∷ []))) free))))))
                     (initable var int) var int (init var var) >> ∅)
                int (←ok int (initable var int) var int (init var var) >> ∅)
                (opt (just (refl , Z)) ∷ (int (just (refl , Z)) ∷ []))
   ok-5 : stok ([ fn (~ int) (free (var fZ) >> ∅) ])
-              ([ ~ {1} int ]) ([ val fZ ]) ([ ~ (just ((bank-def _) , (int (just (bank-def _))))) ])
-              (call fZ (var fZ)) ([ ~ {1} none ])
+              ([ ~ int ]) ([ ~ (just ((bank-def _) , (int (just (bank-def _))))) ])
+              (call fZ (var fZ)) ([ ~ none ])
   ok-5 = call (move var ~Aff (can-move var
                              (can-write (deep var (~ int))
                                         (write-unres var (~ (unborrowed (free ∷ []) free)
@@ -164,8 +149,8 @@ module TestStmt where
                                         (var (~ (unborrowed (free ∷ []) free)))))
                              (void var var))
               (~ int)
-  ok-6 : seqok [] ([ int {0} ]) ([ static ]) ([ int none ])
-               (push int ∅ >> var fZ ← int 1 >> ∅) ([ int {0} (just (bank-def _)) ])
+  ok-6 : seqok [] ([ int ]) ([ int none ])
+               (push int ∅ >> var fZ ← int 1 >> ∅) ([ int (just (bank-def _)) ])
   ok-6 = push ∅ int (int none ∷ []) >> ←ok int (initable var int) var int (init var var) >> ∅
 
 {-

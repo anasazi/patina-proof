@@ -131,8 +131,8 @@ _⊢_mem-ok : ∀ {#x #a #ℓ} → Context #ℓ #x → Mem #x #a → Set
 -}
 
 -- Typing for layouts
-data _,_⊢_∶_layout {#x #a #ℓ} (Γ : Cxt #ℓ #x)
-                              (Σ : Cxt #ℓ #a) : Layout #x #a → Type #ℓ → Set where
+data _,_⊢_∶_layout {#x #a} (Γ : Cxt #x) (Σ : Vec (Type #x) #a)
+                   : Layout #x #a → Type #x → Set where
   -- Integer slots can only be integers
   int : ∀ {n?} → Γ , Σ ⊢ int n? ∶ int layout
   -- A pointer slot can be either kind of pointer (~ or &)
@@ -146,12 +146,12 @@ data _,_⊢_∶_layout {#x #a #ℓ} (Γ : Cxt #ℓ #x)
   opt : ∀ {τ d p} → Γ , Σ ⊢ d ∶ int layout → Γ , Σ ⊢ p ∶ τ layout
       → Γ , Σ ⊢ rec ([ d ,, p ]) ∶ opt τ layout
 
-_,_⊢_mem : ∀ {#x #a #ℓ} → Cxt #ℓ #x → Cxt #ℓ #a → Mem #x #a → Set
+_,_⊢_mem : ∀ {#x #a} → Cxt #x → Vec (Type #x) #a → Mem #x #a → Set
 Γ , Σ ⊢ St , H mem = All2 (λ l τ → Γ , Σ ⊢ l ∶ τ layout) St Γ
                    × All2 (λ l τ → Γ , Σ ⊢ l ∶ τ layout) H Σ
 
 -- Reading preserves types
-read-preservation : ∀ {#x #a #ℓ r l Γ Σ} {M : Mem #x #a} {τ : Type #ℓ}
+read-preservation : ∀ {#x #a r l Γ Σ} {M : Mem #x #a} {τ : Type #x}
                   → Γ , Σ ⊢ M mem
                   → Γ , Σ ⊢ r ∶ τ route
                   → M ⊢ r ⇒ l
@@ -164,7 +164,7 @@ read-preservation ⊢M (pay r∶opt-τ) (∙ r⇒l) with read-preservation ⊢M 
 ... | opt ∙0∶int ∙1∶τ = ∙1∶τ
 
 -- Writing something of the same type as the route does not change the type of memory
-write-preservation : ∀ {#x #a #ℓ r l Γ Σ} {M M′ : Mem #x #a} {τ : Type #ℓ}
+write-preservation : ∀ {#x #a r l Γ Σ} {M M′ : Mem #x #a} {τ : Type #x}
                    → Γ , Σ ⊢ M mem
                    → Γ , Σ ⊢ r ∶ τ route
                    → Γ , Σ ⊢ l ∶ τ layout

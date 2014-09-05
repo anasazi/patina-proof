@@ -40,8 +40,7 @@ data ↓#a-r {#x #a} : ℕ → Route #x (S #a) → Route #x #a → Set where
 Typing for Routes. It is similar to typing for Paths.
 However, note the additional constructors for the two components of Options.
 -}
-data _,_⊢_∶_route {#x #a #ℓ} (Γ : Cxt #ℓ #x)
-                             (Σ : Cxt #ℓ #a) : Route #x #a → Type #ℓ → Set where
+data _,_⊢_∶_route {#x #a} (Γ : Cxt #x) (Σ : Vec (Type #x) #a) : Route #x #a → Type #x → Set where
   stack : ∀ {x} → Γ , Σ ⊢ stack x ∶ Γ ! x route
   heap : ∀ {a} → Γ , Σ ⊢ heap a ∶ Σ ! a route
   disc : ∀ {r τ} → Γ , Σ ⊢ r ∶ opt τ route → Γ , Σ ⊢ < 2 > r ∙ fin 0 ∶ int route

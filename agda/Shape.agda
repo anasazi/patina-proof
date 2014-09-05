@@ -29,40 +29,40 @@ Each step of a Shape contains a Bank, which represents the loan information for 
 -}
 module Shape where
 
-data Shape (#ℓ : ℕ) : Set where
-  int : Maybe (Bank #ℓ) → Shape #ℓ
-  ~ : Maybe (Bank #ℓ × Shape #ℓ) → Shape #ℓ
-  & : Maybe (Bank #ℓ) → Shape #ℓ
-  opt : Maybe (Bank #ℓ) → Shape #ℓ
+data Shape (#x : ℕ) : Set where
+  int : Maybe (Bank #x) → Shape #x
+  ~ : Maybe (Bank #x × Shape #x) → Shape #x
+  & : Maybe (Bank #x) → Shape #x
+  opt : Maybe (Bank #x) → Shape #x
 
-↑#ℓ-δ : ∀ {#ℓ} → ℕ → Shape #ℓ → Shape (S #ℓ)
-↑#ℓ-δ c (int b?) = int (mmap (↑-#ℓ-b 1 c) b?)
-↑#ℓ-δ c (~ b×δ?) = ~ (f b×δ?)
+↑#x-δ : ∀ {#x} → ℕ → Shape #x → Shape (S #x)
+↑#x-δ c (int b?) = int (mmap (↑-#x-b 1 c) b?)
+↑#x-δ c (~ b×δ?) = ~ (f b×δ?)
   where
-  f : ∀ {#ℓ} → Maybe (Bank #ℓ × Shape #ℓ) → Maybe (Bank (S #ℓ) × Shape (S #ℓ))
+  f : ∀ {#x} → Maybe (Bank #x × Shape #x) → Maybe (Bank (S #x) × Shape (S #x))
   f none = none
-  f (just (b , δ)) = just (↑-#ℓ-b 1 c b , ↑#ℓ-δ c δ)
-↑#ℓ-δ c (& b?) = & (mmap (↑-#ℓ-b 1 c) b?)
-↑#ℓ-δ c (opt b?) = opt (mmap (↑-#ℓ-b 1 c) b?)
+  f (just (b , δ)) = just (↑-#x-b 1 c b , ↑#x-δ c δ)
+↑#x-δ c (& b?) = & (mmap (↑-#x-b 1 c) b?)
+↑#x-δ c (opt b?) = opt (mmap (↑-#x-b 1 c) b?)
 
-data ↓#ℓ-δ {#ℓ} : ℕ → Shape (S #ℓ) → Shape #ℓ → Set where
-  int : ∀ {c b? b′?} → mlift (↓1-#ℓ-b c) b? b′? → ↓#ℓ-δ c (int b?) (int b′?)
-  ~⊥ : ∀ {c} → ↓#ℓ-δ c (~ none) (~ none)
-  ~ : ∀ {c δ b δ′ b′} → ↓1-#ℓ-b c b b′ → ↓#ℓ-δ c δ δ′ → ↓#ℓ-δ c (~ (just (b , δ))) (~ (just (b′ , δ′)))
-  & : ∀ {c b? b′?} → mlift (↓1-#ℓ-b c) b? b′? → ↓#ℓ-δ c (& b?) (& b′?)
-  opt : ∀ {c b? b′?} → mlift (↓1-#ℓ-b c) b? b′? → ↓#ℓ-δ c (opt b?) (opt b′?)
+data ↓#x-δ {#x} : ℕ → Shape (S #x) → Shape #x → Set where
+  int : ∀ {c b? b′?} → mlift (↓1-#x-b c) b? b′? → ↓#x-δ c (int b?) (int b′?)
+  ~⊥ : ∀ {c} → ↓#x-δ c (~ none) (~ none)
+  ~ : ∀ {c δ b δ′ b′} → ↓1-#x-b c b b′ → ↓#x-δ c δ δ′ → ↓#x-δ c (~ (just (b , δ))) (~ (just (b′ , δ′)))
+  & : ∀ {c b? b′?} → mlift (↓1-#x-b c) b? b′? → ↓#x-δ c (& b?) (& b′?)
+  opt : ∀ {c b? b′?} → mlift (↓1-#x-b c) b? b′? → ↓#x-δ c (opt b?) (opt b′?)
 
-State : ℕ → ℕ → Set
-State #ℓ #x = Vec (Shape #ℓ) #x
+State : ℕ → Set
+State #x = Vec (Shape #x) #x
 
-data _⊢_shape {#ℓ} : Type #ℓ → Shape #ℓ → Set where
+data _⊢_shape {#x} : Type #x → Shape #x → Set where
   int : ∀ {b?} → int ⊢ int b? shape
   ~ : ∀ {τ b δ} → τ ⊢ δ shape → ~ τ ⊢ ~ (just (b , δ)) shape
   ~⊥ : ∀ {τ} → ~ τ ⊢ ~ none shape
   & : ∀ {ℓ μ τ b?} → & ℓ μ τ ⊢ & b? shape
   opt : ∀ {τ b?} → opt τ ⊢ opt b? shape
 
-_⊢_state : ∀ {#ℓ #x} → Cxt #ℓ #x → State #ℓ #x → Set
+_⊢_state : ∀ {#x} → Cxt #x → State #x → Set
 Γ ⊢ Δ state = All2 (λ τ δ → τ ⊢ δ shape) Γ Δ
 
 init-shape : ∀ {#ℓ} → Type #ℓ → Shape #ℓ
@@ -94,115 +94,113 @@ data _⊢_∶_rep {#ℓ #x #a} (M : Mem #x #a) : Layout #x #a → Shape #ℓ →
   none : ∀ {b l} → M ⊢ l init → M ⊢ rec ([ int (just 0) ,, l ]) ∶ opt (just b) rep
   some : ∀ {b l} → M ⊢ l init → M ⊢ rec ([ int (just 1) ,, l ]) ∶ opt (just b) rep
 
-_⊢_mem-state : ∀ {#ℓ #x #a} → State #ℓ #x → Mem #x #a → Set
+_⊢_mem-state : ∀ {#x #a} → State #x → Mem #x #a → Set
 Δ ⊢ M mem-state = All2 (λ δ l → M ⊢ l ∶ δ rep) Δ (fst M)
 
-data _,_⊢_⇒_shape {#ℓ #x} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) : Path #x → Shape #ℓ → Set where
+data _,_⊢_⇒_shape {#x} (Γ : Cxt #x) (Δ : State #x) : Path #x → Shape #x → Set where
   var : ∀ {x} → Γ , Δ ⊢ var x ⇒ Δ ! x shape
   *~ : ∀ {p δ b} → Γ , Δ ⊢ p ⇒ ~ (just (b , δ)) shape → Γ , Δ ⊢ * p ⇒ δ shape
   *& : ∀ {p b τ} → Γ , Δ ⊢ p ⇒ & (just b) shape → Γ ⊢ p ∶ τ path → Γ , Δ ⊢ * p ⇒ init-shape τ shape
 
-data _,_⊢_≔_⇒_shape {#ℓ #x} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x)
-                    : Path #x → Shape #ℓ → State #ℓ #x → Set where
+data _,_⊢_≔_⇒_shape {#x} (Γ : Cxt #x) (Δ : State #x)
+                    : Path #x → Shape #x → State #x → Set where
   var : ∀ {x δ} → Γ , Δ ⊢ var x ≔ δ ⇒ set Δ x δ shape
   * : ∀ {p δ δ′ Δ′}
     → Γ , Δ ⊢ p ⇒ ~ δ′ shape
     → Γ , Δ ⊢ p ≔ ~ (just (bank-def _ , δ)) ⇒ Δ′ shape
     → Γ , Δ ⊢ * p ≔ δ ⇒ Δ′ shape
 
-record _,_⊢_⇒_init {#x #ℓ} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) (p : Path #x)
-                           (Δ′ : State #ℓ #x) : Set where
+record _,_⊢_⇒_init {#x} (Γ : Cxt #x) (Δ : State #x) (p : Path #x) (Δ′ : State #x) : Set where
   constructor init
   field
-    {τ} : Type #ℓ
+    {τ} : Type #x
     path : Γ ⊢ p ∶ τ path
     write : Γ , Δ ⊢ p ≔ init-shape τ ⇒ Δ′ shape
 
-record _,_⊢_⇒_void {#x #ℓ} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) (p : Path #x)
-                           (Δ′ : State #ℓ #x) : Set where
+record _,_⊢_⇒_void {#x} (Γ : Cxt #x) (Δ : State #x) (p : Path #x) (Δ′ : State #x) : Set where
   constructor void
   field
-    {τ} : Type #ℓ
+    {τ} : Type #x
     path : Γ ⊢ p ∶ τ path
     write : Γ , Δ ⊢ p ≔ void-shape τ ⇒ Δ′ shape
 
-data _borrow_for_⇒_ {#ℓ} : Mut → Shape #ℓ → Life #ℓ → Shape #ℓ → Set where
+data _borrow_for_⇒_ {#x} : Mut → Shape #x → Life #x → Shape #x → Set where
   int : ∀ {μ ℓ b} → μ borrow int (just b) for ℓ ⇒ int (just (make-loan b ℓ μ))
   ~ : ∀ {μ ℓ b δ} → μ borrow ~ (just (b , δ)) for ℓ ⇒ ~ (just (make-loan b ℓ μ , δ))
   & : ∀ {μ ℓ b} → μ borrow & (just b) for ℓ ⇒ & (just (make-loan b ℓ μ))
   opt : ∀ {μ ℓ b} → μ borrow opt (just b) for ℓ ⇒ opt (just (make-loan b ℓ μ))
 
-record _,_⊢_borrow_for_⇒_ {#x #ℓ} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) (μ : Mut)
-                          (p : Path #x) (ℓ : Life #ℓ) (Δ′ : State #ℓ #x) : Set where
+record _,_⊢_borrow_for_⇒_ {#x} (Γ : Cxt #x) (Δ : State #x) (μ : Mut)
+                          (p : Path #x) (ℓ : Life #x) (Δ′ : State #x) : Set where
   constructor borrow
   field
-    {δ δ′} : Shape #ℓ
+    {δ δ′} : Shape #x
     shallow : Γ , Δ ⊢ p ⇒ δ shape
     borrowed : μ borrow δ for ℓ ⇒ δ′
     write : Γ , Δ ⊢ p ≔ δ′ ⇒ Δ′ shape
 
-data _Full {#ℓ} : Shape #ℓ → Set where
+data _Full {#x} : Shape #x → Set where
   int : ∀ {b} → int (just b) Full
   ~ : ∀ {δ b} → δ Full → ~ (just (b , δ)) Full
   & : ∀ {b} → & (just b) Full
   opt : ∀ {b} → opt (just b) Full
 
-record _,_⊢_deep {#ℓ #x} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) (p : Path #x) : Set where
+record _,_⊢_deep {#x} (Γ : Cxt #x) (Δ : State #x) (p : Path #x) : Set where
   constructor deep
   field
-    {δ} : Shape #ℓ
+    {δ} : Shape #x
     shallow : Γ , Δ ⊢ p ⇒ δ shape
     full : δ Full
 
-data _Empty {#ℓ} : Shape #ℓ → Set where
+data _Empty {#x} : Shape #x → Set where
   int : int none Empty
   ~ : ~ none Empty
   & : & none Empty
   opt : opt none Empty
 
-record _,_⊢_initable {#ℓ #x} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) (p : Path #x) : Set where
+record _,_⊢_initable {#x} (Γ : Cxt #x) (Δ : State #x) (p : Path #x) : Set where
   constructor initable
   field
-    {δ} : Shape #ℓ
+    {δ} : Shape #x
     shallow : Γ , Δ ⊢ p ⇒ δ shape
     empty : δ Empty
 
-data _⊢_Dropped {#ℓ} : Type #ℓ → Shape #ℓ → Set where
+data _⊢_Dropped {#x} : Type #x → Shape #x → Set where
   int : ∀ {b?} → int ⊢ int b? Dropped
   ~-drop : ∀ {τ} → ~ τ ⊢ ~ none Dropped
   & : ∀ {ℓ μ τ b?} → & ℓ μ τ ⊢ & b? Dropped
   opt-¬drop : ∀ {τ} → τ ¬Drop → opt τ ⊢ opt none Dropped
   opt-drop : ∀ {τ b?} → τ Drop → opt τ ⊢ opt b? Dropped
 
-record _,_⊢_dropped {#ℓ #x} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) (p : Path #x) : Set where
+record _,_⊢_dropped {#x} (Γ : Cxt #x) (Δ : State #x) (p : Path #x) : Set where
   constructor dropped
   field
-    {δ} : Shape #ℓ
+    {δ} : Shape #x
     shallow : Γ , Δ ⊢ p ⇒ δ shape
-    {τ} : Type #ℓ
+    {τ} : Type #x
     path : Γ ⊢ p ∶ τ path
     cleaned : τ ⊢ δ Dropped
 
-data read-unrestricted {#ℓ} : Shape #ℓ → Set where
+data read-unrestricted {#x} : Shape #x → Set where
   int : ∀ {b} → Readable b → read-unrestricted (int (just b))
   ~ : ∀ {b δ} → Readable b → read-unrestricted δ → read-unrestricted (~ (just (b , δ)))
   & : ∀ {b} → Readable b → read-unrestricted (& (just b))
   opt : ∀ {b} → Readable b → read-unrestricted (opt (just b))
 
-record _,_⊢_read-unrestricted {#ℓ #x} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) (p : Path #x) : Set where
+record _,_⊢_read-unrestricted {#x} (Γ : Cxt #x) (Δ : State #x) (p : Path #x) : Set where
   constructor read-unres
   field
-    {δ} : Shape #ℓ
+    {δ} : Shape #x
     shallow : Γ , Δ ⊢ p ⇒ δ shape
     unrestricted : read-unrestricted δ
 
-data read-unencumbered {#ℓ} : Shape #ℓ → Set where
+data read-unencumbered {#x} : Shape #x → Set where
   int : ∀ {b} → NoMuts b → read-unencumbered (int (just b))
   ~ : ∀ {b δ} → NoMuts b → read-unencumbered (~ (just (b , δ)))
   & : ∀ {b} → NoMuts b → read-unencumbered (& (just b))
   opt : ∀ {b} → NoMuts b → read-unencumbered (opt (just b))
 
-data _,_⊢_read-unencumbered {#ℓ #x} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) : Path #x → Set where
+data _,_⊢_read-unencumbered {#x} (Γ : Cxt #x) (Δ : State #x) : Path #x → Set where
   var : ∀ {x} → read-unencumbered (Δ ! x) → Γ , Δ ⊢ var x read-unencumbered
   * : ∀ {p δ}
     → Γ , Δ ⊢ p read-unencumbered
@@ -212,46 +210,46 @@ data _,_⊢_read-unencumbered {#ℓ #x} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) 
 
 private
 
-  read-unencumbered-1 : ([ & (val {2} fZ) mut int ])
-                      , [ & (just (bank ([ free ,, loan imm ]) free)) ]
+  read-unencumbered-1 : ([ & (val fZ) mut int ,, int  ])
+                      , [ & (just (bank ([ free ,, loan imm ]) free)) ,, int none ]
                       ⊢ var fZ read-unencumbered
   read-unencumbered-1 = var (& (nomuts (free ∷ imm ∷ []) free))
-  read-unencumbered-2 : ¬ (([ & (val {2} fZ) mut int ])
-                      , [ & (just (bank ([ free ,, loan mut ]) free)) ]
+  read-unencumbered-2 : ¬ (([ & (val fZ) mut int ,, int ])
+                      , [ & (just (bank ([ free ,, loan mut ]) free)) ,, int none ]
                       ⊢ var fZ read-unencumbered)
   read-unencumbered-2 (var (& (nomuts (free ∷ () ∷ []) free)))
-  read-unencumbered-3 : ([ ~ {1} int ])
+  read-unencumbered-3 : ([ ~ int ])
                       , [ ~ (just (bank ([ loan imm ]) free , int (just (bank-def _)))) ]
                       ⊢ * (var fZ) read-unencumbered
   read-unencumbered-3 = * (var (~ (nomuts (imm ∷ []) free))) (*~ var) (int (nomuts (free ∷ []) free))
 
-record _,_⊢_readable {#x #ℓ} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) (p : Path #x) : Set where
+record _,_⊢_readable {#x} (Γ : Cxt #x) (Δ : State #x) (p : Path #x) : Set where
   constructor can-read
   field
     deep-init : Γ , Δ ⊢ p deep
     unrestricted : Γ , Δ ⊢ p read-unrestricted
     unencumbered : Γ , Δ ⊢ p read-unencumbered
 
-data write-unrestricted {#ℓ} : Shape #ℓ → Set where    
+data write-unrestricted {#x} : Shape #x → Set where    
   int : ∀ {b} → Unborrowed b → write-unrestricted (int (just b))
   ~ : ∀ {b δ} → Unborrowed b → write-unrestricted δ → write-unrestricted (~ (just (b , δ)))
   & : ∀ {b} → Unborrowed b → write-unrestricted (& (just b))
   opt : ∀ {b} → Unborrowed b → write-unrestricted (opt (just b))
 
-record _,_⊢_write-unrestricted {#ℓ #x} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) (p : Path #x) : Set where
+record _,_⊢_write-unrestricted {#x} (Γ : Cxt #x) (Δ : State #x) (p : Path #x) : Set where
   constructor write-unres
   field
-    {δ} : Shape #ℓ
+    {δ} : Shape #x
     shallow : Γ , Δ ⊢ p ⇒ δ shape
     unrestricted : write-unrestricted δ
 
-data write-unencumbered {#ℓ} : Shape #ℓ → Set where
+data write-unencumbered {#x} : Shape #x → Set where
   int : ∀ {b} → Unborrowed b → write-unencumbered (int (just b))
   ~ : ∀ {b δ} → Unborrowed b → write-unencumbered (~ (just (b , δ)))
   & : ∀ {b} → Unborrowed b → write-unencumbered (& (just b))
   opt : ∀ {b} → Unborrowed b → write-unencumbered (opt (just b))
 
-data _,_⊢_write-unencumbered {#ℓ #x} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) : Path #x → Set where
+data _,_⊢_write-unencumbered {#x} (Γ : Cxt #x) (Δ : State #x) : Path #x → Set where
   var : ∀ {x} → write-unencumbered (Δ ! x) → Γ , Δ ⊢ var x write-unencumbered
   * : ∀ {p δ}
     → Γ , Δ ⊢ p write-unencumbered
@@ -259,20 +257,20 @@ data _,_⊢_write-unencumbered {#ℓ #x} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x)
     → write-unencumbered δ
     → Γ , Δ ⊢ * p write-unencumbered
 
-record _,_⊢_writeable {#x #ℓ} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) (p : Path #x) : Set where
+record _,_⊢_writeable {#x} (Γ : Cxt #x) (Δ : State #x) (p : Path #x) : Set where
   constructor can-write
   field
     deep-init : Γ , Δ ⊢ p deep
     unrestricted : Γ , Δ ⊢ p write-unrestricted
     unencumbered : Γ , Δ ⊢ p write-unencumbered
 
-record _,_⊢_movable {#x #ℓ} (Γ : Cxt #ℓ #x) (Δ : State #ℓ #x) (p : Path #x) : Set where
+record _,_⊢_movable {#x} (Γ : Cxt #x) (Δ : State #x) (p : Path #x) : Set where
   constructor can-move
   field
     owned : Γ ⊢ p owned
     writable : Γ , Δ ⊢ p writeable
 
-data _,_⊢_∶_⇒_ {#x #ℓ} : Cxt #ℓ #x → State #ℓ #x → Path #x → Type #ℓ → State #ℓ #x → Set where
+data _,_⊢_∶_⇒_ {#x} : Cxt #x → State #x → Path #x → Type #x → State #x → Set where
   copy : ∀ {Γ Δ p τ}
        -- copyable type
        → Γ ⊢ p ∶ τ path
@@ -289,16 +287,16 @@ data _,_⊢_∶_⇒_ {#x #ℓ} : Cxt #ℓ #x → State #ℓ #x → Path #x → T
        → Γ , Δ ⊢ p ⇒ Δ′ void
        → Γ , Δ ⊢ p ∶ τ ⇒ Δ′
 
-use-to-path : ∀ {#x #ℓ Δ Δ′ p τ} {Γ : Cxt #ℓ #x}
+use-to-path : ∀ {#x Δ Δ′ p τ} {Γ : Cxt #x}
             → Γ , Δ ⊢ p ∶ τ ⇒ Δ′
             → Γ ⊢ p ∶ τ path
 use-to-path (copy p∶τ _ _) = p∶τ
 use-to-path (move p∶τ _ _ _) = p∶τ
 
-data _,_⊢_∶_⇒_many {#x #ℓ} : ∀ {n} → Cxt #ℓ #x → State #ℓ #x → Vec (Path #x) n
-                           → Vec (Type #ℓ) n → State #ℓ #x → Set where
+data _,_⊢_∶_⇒_many {#x} : ∀ {n} → Cxt #x → State #x → Vec (Path #x) n
+                           → Vec (Type #x) n → State #x → Set where
   [] : ∀ {Γ Δ} → Γ , Δ ⊢ [] ∶ [] ⇒ Δ many
-  _∷_ : ∀ {n Γ p ps τ Δ₀ Δ₁ Δ₂} {τs : Vec (Type #ℓ) n}
+  _∷_ : ∀ {n Γ p ps τ Δ₀ Δ₁ Δ₂} {τs : Vec (Type #x) n}
       → Γ , Δ₀ ⊢ p ∶ τ ⇒ Δ₁
       → Γ , Δ₁ ⊢ ps ∶ τs ⇒ Δ₂ many
       → Γ , Δ₀ ⊢ p ∷ ps ∶ τ ∷ τs ⇒ Δ₂ many

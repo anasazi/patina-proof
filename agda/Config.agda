@@ -10,26 +10,25 @@ module Config where
 record Config {#f} (F : Funcs #f) : Set where
   constructor config
   field
-    {#x #a #ℓ} : ℕ
-    Γ : Cxt #ℓ #x
+    {#x #a} : ℕ
+    Γ : Cxt #x
     M : Mem #x #a
-    t : Trace #f #x #ℓ
+    t : Trace #f #x
 
 data Finished {#f} {F : Funcs #f} : Config F → Set where
-  finished : ∀ {#x #a #ℓ} {Γ : Cxt #ℓ #x} {M : Mem #x #a} → Finished (config Γ M ∅)
+  finished : ∀ {#x #a} {Γ : Cxt #x} {M : Mem #x #a} → Finished (config Γ M ∅)
 
 record cok {#f} (F : Funcs #f) (C : Config F) : Set where
   constructor config
   field
     F-ok : All (fnok F) F
-    {L} : Lifes (Config.#ℓ C) (Config.#x C)
-    {Δ} : State (Config.#ℓ C) (Config.#x C)
-    {T} : Cxt (Config.#ℓ C) (Config.#a C)
+    {Δ} : State (Config.#x C)
+    {T} : Vec (Type (Config.#x C)) (Config.#a C)
     Γ⊢Δ : Config.Γ C ⊢ Δ state
     Δ⊢M : Δ ⊢ Config.M C mem-state
     Γ,T⊢M : Config.Γ C , T ⊢ Config.M C mem
     NG : NoGarbage (Config.M C)
-    ⊢t : tok F {#ℓ′ = 0} (Config.Γ C) L Δ (Config.t C) []
+    ⊢t : tok F (Config.Γ C) Δ (Config.t C) []
 
 record cev {#f} (F : Funcs #f) (C₁ C₂ : Config F) : Set where
   constructor config

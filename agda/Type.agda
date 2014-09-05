@@ -7,21 +7,21 @@ module Type where
 {-
 Types are indexed by the lifetime relation (so the lifetimes of & are always well-formed).
 -}
-data Type (#ℓ : ℕ) : Set where
-  int : Type #ℓ
-  ~ : Type #ℓ → Type #ℓ
-  & : Life #ℓ → Mut → Type #ℓ → Type #ℓ
-  opt : Type #ℓ → Type #ℓ
+data Type (#x : ℕ) : Set where
+  int : Type #x
+  ~ : Type #x → Type #x
+  & : Life #x → Mut → Type #x → Type #x
+  opt : Type #x → Type #x
 
 private
-  ~-inj : ∀ {#ℓ} {τ₁ τ₂ : Type #ℓ} → ~ τ₁ ≡ ~ τ₂ → τ₁ ≡ τ₂
+  ~-inj : ∀ {#x} {τ₁ τ₂ : Type #x} → ~ τ₁ ≡ ~ τ₂ → τ₁ ≡ τ₂
   ~-inj refl = refl
-  &-inj : ∀ {#ℓ μ} {ℓ₁ ℓ₂ : Life #ℓ} {τ₁ τ₂ : Type #ℓ} → & ℓ₁ μ τ₁ ≡ & ℓ₂ μ τ₂ → ℓ₁ ≡ ℓ₂ × τ₁ ≡ τ₂
+  &-inj : ∀ {#x μ} {ℓ₁ ℓ₂ : Life #x} {τ₁ τ₂ : Type #x} → & ℓ₁ μ τ₁ ≡ & ℓ₂ μ τ₂ → ℓ₁ ≡ ℓ₂ × τ₁ ≡ τ₂
   &-inj refl = refl , refl
-  opt-inj : ∀ {#ℓ} {τ₁ τ₂ : Type #ℓ} → opt τ₁ ≡ opt τ₂ → τ₁ ≡ τ₂
+  opt-inj : ∀ {#x} {τ₁ τ₂ : Type #x} → opt τ₁ ≡ opt τ₂ → τ₁ ≡ τ₂
   opt-inj refl = refl
 
-  _=type=_ : ∀  {#ℓ} → (τ₁ τ₂ : Type #ℓ) → Dec (τ₁ ≡ τ₂)
+  _=type=_ : ∀  {#x} → (τ₁ τ₂ : Type #x) → Dec (τ₁ ≡ τ₂)
   int =type= int = yes refl
   int =type= ~ τ₂ = no (λ ())
   int =type= & ℓ₂ μ₂ τ₂ = no (λ ())
@@ -54,31 +54,28 @@ private
   opt τ₂ =type= opt .τ₂ | yes refl = yes refl
   opt τ₁ =type= opt τ₂ | no neq = no (neq ∘ opt-inj)
 
-EqType : ∀ {#ℓ} → Eq (Type #ℓ)
+EqType : ∀ {#x} → Eq (Type #x)
 EqType = record { _==_ = _=type=_ }
 
 -- A context is a vector of types (variables -> types)
-Cxt : ℕ → ℕ → Set
-Cxt #ℓ #x = Vec (Type #ℓ) #x
-
-RCxt : ℕ → ℕ → ℕ → Set
-RCxt #ℓ #x #a = Cxt #ℓ #x × Cxt #ℓ #a
+Cxt : ℕ → Set
+Cxt #x = Vec (Type #x) #x
 
 -- upshift and downshift for the indicies of types
-↑#ℓ-τ : ∀ {#ℓ} → ℕ → Type #ℓ → Type (S #ℓ)
-↑#ℓ-τ c int = int
-↑#ℓ-τ c (~ τ) = ~ (↑#ℓ-τ c τ)
-↑#ℓ-τ c (& ℓ μ τ) = & (↑#ℓ-ℓ c ℓ) μ (↑#ℓ-τ c τ)
-↑#ℓ-τ c (opt τ) = opt (↑#ℓ-τ c τ)
+↑#x-τ : ∀ {#x} → ℕ → Type #x → Type (S #x)
+↑#x-τ c int = int
+↑#x-τ c (~ τ) = ~ (↑#x-τ c τ)
+↑#x-τ c (& ℓ μ τ) = & (↑#x-ℓ c ℓ) μ (↑#x-τ c τ)
+↑#x-τ c (opt τ) = opt (↑#x-τ c τ)
 
-data ↓#ℓ-τ {#ℓ} : ℕ → Type (S #ℓ) → Type #ℓ → Set where
-  int : ∀ {c} → ↓#ℓ-τ c int int
-  ~ : ∀ {c τ τ′} → ↓#ℓ-τ c τ τ′ → ↓#ℓ-τ c (~ τ) (~ τ′)
-  & : ∀ {c ℓ ℓ′ μ τ τ′} → ↓#ℓ-ℓ c ℓ ℓ′ → ↓#ℓ-τ c τ τ′ → ↓#ℓ-τ c (& ℓ μ τ) (& ℓ′ μ τ′)
-  opt : ∀ {c τ τ′} → ↓#ℓ-τ c τ τ′ → ↓#ℓ-τ c (opt τ) (opt τ′)
+data ↓#x-τ {#x} : ℕ → Type (S #x) → Type #x → Set where
+  int : ∀ {c} → ↓#x-τ c int int
+  ~ : ∀ {c τ τ′} → ↓#x-τ c τ τ′ → ↓#x-τ c (~ τ) (~ τ′)
+  & : ∀ {c ℓ ℓ′ μ τ τ′} → ↓#x-ℓ c ℓ ℓ′ → ↓#x-τ c τ τ′ → ↓#x-τ c (& ℓ μ τ) (& ℓ′ μ τ′)
+  opt : ∀ {c τ τ′} → ↓#x-τ c τ τ′ → ↓#x-τ c (opt τ) (opt τ′)
 
 -- The subtyping relationship
-data _<:_ {#ℓ} : Type #ℓ → Type #ℓ → Set where
+data _<:_ {#x} : Type #x → Type #x → Set where
   int : int <: int
   ~ : ∀ {τ₁ τ₂}
     → τ₁ <: τ₂
@@ -108,19 +105,19 @@ test-subtype-6 : ~ (& {3} (val (fin 2)) mut int) <: ~ (& (val (fin 1)) mut int)
 test-subtype-6 = ~ (&mut (val-val (s<s z<s)))
 
 -- Predicate for implicitly copyable types
-data _Copy {#ℓ} : Type #ℓ → Set where
+data _Copy {#x} : Type #x → Set where
   int : int Copy
   &imm : ∀ {ℓ τ} → & ℓ imm τ Copy
   opt : ∀ {τ} → τ Copy → opt τ Copy
 
 -- Predicate for affine types
-data _Affine {#ℓ} : Type #ℓ → Set where
+data _Affine {#x} : Type #x → Set where
   ~Aff : ∀ {τ} → ~ τ Affine
   &mut : ∀ {ℓ τ} → & ℓ mut τ Affine
   opt : ∀ {τ} → τ Affine → opt τ Affine
 
 -- No type is both Copy and Affine
-copy×affine≡⊥ : ∀ {#ℓ} → (τ : Type #ℓ) → ¬ (τ Copy × τ Affine)
+copy×affine≡⊥ : ∀ {#x} → (τ : Type #x) → ¬ (τ Copy × τ Affine)
 copy×affine≡⊥ int (copy , ())
 copy×affine≡⊥ (~ τ) (() , affine)
 copy×affine≡⊥ (& ℓ imm τ) (copy , ())
@@ -128,7 +125,7 @@ copy×affine≡⊥ (& ℓ mut τ) (() , affine)
 copy×affine≡⊥ (opt τ) (opt copy , opt affine) = copy×affine≡⊥ τ (copy , affine)
 
 -- Every type is either Copy or Affine
-copy+affine≡⊤ : ∀ {#ℓ} → (τ : Type #ℓ) → τ Copy + τ Affine
+copy+affine≡⊤ : ∀ {#x} → (τ : Type #x) → τ Copy + τ Affine
 copy+affine≡⊤ int = inl int
 copy+affine≡⊤ (~ τ) = inr ~Aff
 copy+affine≡⊤ (& ℓ imm τ) = inl &imm
@@ -140,32 +137,32 @@ copy+affine≡⊤ (opt τ) | inr affine = inr (opt affine)
 -- Thus, Affine is a correct negation of Copy
 
 -- Predicate for types which must drop heap memory
-data _Drop {#ℓ} : Type #ℓ → Set where
+data _Drop {#x} : Type #x → Set where
   ~ : ∀ {τ} → ~ τ Drop
   opt : ∀ {τ} → τ Drop → opt τ Drop
 
 -- Predicate for types which do not need to drop heap memory
-data _¬Drop {#ℓ} : Type #ℓ → Set where
+data _¬Drop {#x} : Type #x → Set where
   int : int ¬Drop
   & : ∀ {ℓ μ τ} → & ℓ μ τ ¬Drop
   opt : ∀ {τ} → τ ¬Drop → opt τ ¬Drop
 
 -- No type is both Copy and Drop
-drop×copy≡⊥ : ∀ {#ℓ} → (τ : Type #ℓ) → ¬ (τ Drop × τ Copy)
+drop×copy≡⊥ : ∀ {#x} → (τ : Type #x) → ¬ (τ Drop × τ Copy)
 drop×copy≡⊥ int (() , copy)
 drop×copy≡⊥ (~ τ) (drop , ())
 drop×copy≡⊥ (& ℓ μ τ) (() , copy)
 drop×copy≡⊥ (opt τ) (opt drop , opt copy) = drop×copy≡⊥ τ (drop , copy)
 
 -- No type is both Drop and ¬Drop
-drop×¬drop≡⊥ : ∀ {#ℓ} → (τ : Type #ℓ) → ¬ (τ Drop × τ ¬Drop)
+drop×¬drop≡⊥ : ∀ {#x} → (τ : Type #x) → ¬ (τ Drop × τ ¬Drop)
 drop×¬drop≡⊥ int (() , ¬drop)
 drop×¬drop≡⊥ (~ τ) (drop , ())
 drop×¬drop≡⊥ (& ℓ μ τ) (() , ¬drop)
 drop×¬drop≡⊥ (opt τ) (opt drop , opt ¬drop) = drop×¬drop≡⊥ τ (drop , ¬drop)
 
 -- Every type is either Drop or ¬Drop
-drop+¬drop≡⊤ : ∀ {#ℓ} → (τ : Type #ℓ) → τ Drop + τ ¬Drop
+drop+¬drop≡⊤ : ∀ {#x} → (τ : Type #x) → τ Drop + τ ¬Drop
 drop+¬drop≡⊤ int = inr int
 drop+¬drop≡⊤ (~ τ) = inl ~
 drop+¬drop≡⊤ (& ℓ μ τ) = inr &
@@ -176,10 +173,10 @@ drop+¬drop≡⊤ (opt τ) | inr ¬drop = inr (opt ¬drop)
 -- Thus ¬Drop is a correct negation of Drop
 
 -- nicer name for the above proof
-_Drop? : ∀ {#ℓ} → (τ : Type #ℓ) → τ Drop + τ ¬Drop
+_Drop? : ∀ {#x} → (τ : Type #x) → τ Drop + τ ¬Drop
 _Drop? τ = drop+¬drop≡⊤ τ
 
-data _bound-by_ {#ℓ} : Type #ℓ → Life #ℓ → Set where
+data _bound-by_ {#x} : Type #x → Life #x → Set where
   int : ∀ {ℓ} → int bound-by ℓ
   ~ : ∀ {τ ℓ} → τ bound-by ℓ → ~ τ bound-by ℓ
   & : ∀ {ℓ′ μ τ ℓ} → ℓ :<: ℓ′ → τ bound-by ℓ → & ℓ′ μ τ bound-by ℓ
