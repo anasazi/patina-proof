@@ -1,3 +1,14 @@
+9-4-14 (Addendum)
+
+I merged the stack variable (#x) and lifetime value (#ℓ) indicies.
+This brings the total index set to:
+
+#x - the number of stack variables/lifetime values/regions
+#a - the number of heap allocations
+#s - the number of structs
+#f - the number of functions
+#ℓ - the number of lifetime variables (reusing ℓ rather than ̷L)
+
 9-4-14
 
 I realized that Routes shouldn't have a pointer dereference constructor.
