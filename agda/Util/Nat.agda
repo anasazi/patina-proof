@@ -19,16 +19,17 @@ module Util.Nat where
   S-inj : ∀ {n m} → S n ≡ S m → n ≡ m
   S-inj refl = refl
 
-  _=ℕ=_ : (a b : ℕ) → Dec (a ≡ b)
-  Z =ℕ= Z = yes refl
-  Z =ℕ= S b = no (λ ())
-  S a =ℕ= Z = no (λ ())
-  S a =ℕ= S b with a =ℕ= b
-  ... | yes p = yes (cong S p)
-  ... | no p = no (p ∘ S-inj)
+  instance
+    _=ℕ=_ : (a b : ℕ) → Dec (a ≡ b)
+    Z =ℕ= Z = yes refl
+    Z =ℕ= S b = no (λ ())
+    S a =ℕ= Z = no (λ ())
+    S a =ℕ= S b with a =ℕ= b
+    ... | yes p = yes (cong S p)
+    ... | no p = no (p ∘ S-inj)
 
-  EqNat : Eq ℕ
-  EqNat = record { _==_ = _=ℕ=_ }
+    EqNat : Eq ℕ
+    EqNat = record { _==_ = _=ℕ=_ }
 
   plus-0-r : ∀ n → plus n 0 ≡ n
   plus-0-r Z = refl
@@ -47,9 +48,9 @@ module Util.Nat where
   plus-assoc (S n) m o = cong S (plus-assoc n m o)
 
   plus-swap : ∀ n m o → plus n (plus m o) ≡ plus m (plus n o)
-  plus-swap n m o = sym (plus-assoc n m o)
-                  ~ (cong (λ x → plus x o) (plus-comm n m)
-                  ~ plus-assoc m n o)
+  plus-swap n m o = trans (sym (plus-assoc n m o))
+                   (trans (cong (λ x → plus x o) (plus-comm n m))
+                          (plus-assoc m n o))
   
   max : ℕ → ℕ → ℕ
   max Z m = m
@@ -92,3 +93,19 @@ module Util.Nat where
   lessNat n Z = false
   lessNat Z (S m) = true
   lessNat (S n) (S m) = lessNat n m
+
+  ≤-refl : ∀ n → n ≤ n
+  ≤-refl Z = z<s
+  ≤-refl (S x) = s<s (≤-refl x)
+
+  ≤-antisym : ∀ {n m} → n ≤ m → m ≤ n → n ≡ m
+  ≤-antisym z<s z<s = refl
+  ≤-antisym z<s (s<s ())
+  ≤-antisym (s<s ()) z<s
+  ≤-antisym (s<s n≤m) (s<s m≤n) = cong S (≤-antisym n≤m m≤n)
+
+  ≤-trans : ∀ {n m o} → n ≤ m → m ≤ o → n ≤ o
+  ≤-trans z<s m≤o = z<s
+  ≤-trans (s<s ()) z<s
+  ≤-trans (s<s x) (s<s z<s) = s<s (≤-trans x z<s)
+  ≤-trans (s<s x) (s<s (s<s x₁)) = s<s (≤-trans x (s<s x₁))

@@ -37,14 +37,15 @@ module Life where
 -- + the number of lifetime values (#ℓ)
 -- + the number of lifetime variables (#Ł)
 -- which encodes the lifetime relation.
-data Life (#x : ℕ) : Set where
+data Life (#x #ℓ : ℕ) : Set where
   -- A lifetime variabel is identified by some element of the finite set of size #Ł
-  --var : Fin #Ł → Life #ℓ
+  var : (ℓ : Fin #ℓ) → Life #x #ℓ
   -- The static lifetime is always in scope
-  static : Life #x
+  static : Life #x #ℓ
   -- A lifetime value is identified by some element of the finite set of size #ℓ
-  val : Fin #x → Life #x
+  val : (x : Fin #x) → Life #x #ℓ
 
+  {-
 private
   val-inj : ∀ {#x} {i j : Fin #x} → val i ≡ val j → i ≡ j
   val-inj refl = refl
@@ -59,15 +60,25 @@ private
 
 EqLife : ∀ {#x} → Eq (Life #x)
 EqLife = record { _==_ = _=life=_ }
+-}
 
 -- upshifting and downshifting for lifetimes
-↑#x-ℓ : ∀ {#x} → ℕ → Life #x → Life (S #x)
+↑#x-ℓ : ∀ {#x #ℓ} → ℕ → Life #x #ℓ → Life (S #x) #ℓ
+--↑#x-ℓ : ∀ {#x} → ℕ → Life #x → Life (S #x)
 ↑#x-ℓ c static = static
 ↑#x-ℓ c (val x) = val (↑ c x)
+↑#x-ℓ c (var ℓ) = var ℓ
 
-data ↓#x-ℓ {#x} : ℕ → Life (S #x) → Life #x → Set where
+data ↓#x-ℓ {#x #ℓ} : ℕ → Life (S #x) #ℓ → Life #x #ℓ → Set where
+--data ↓#x-ℓ {#x} : ℕ → Life (S #x) → Life #x → Set where
   static : ∀ {c} → ↓#x-ℓ c static static
   val : ∀ {c x x′} → ↓ c x x′ → ↓#x-ℓ c (val x) (val x′)
+  var : ∀ {c ℓ} → ↓#x-ℓ c (var ℓ) (var ℓ)
+
+↑#ℓ-ℓ : ∀ {#x #ℓ} → ℕ → Life #x #ℓ → Life #x (S #ℓ)
+↑#ℓ-ℓ c static = static
+↑#ℓ-ℓ c (val x) = val x
+↑#ℓ-ℓ c (var ℓ) = var (↑ c ℓ)
 
   {-
 Lifes : ℕ → ℕ → Set
@@ -75,16 +86,45 @@ Lifes #ℓ #x = Vec (Life #ℓ) #x
 -}
 
 -- The ordering relationship on lifetimes.
-data _:<:_ {#x : ℕ} : Life #x → Life #x → Set where
+data _:<:_ {#x #ℓ : ℕ} : Life #x #ℓ → Life #x #ℓ → Set where
+--data _:<:_ {#x : ℕ} : Life #x → Life #x → Set where
   -- The relationship is reflexive for all three constructors
-  --var-refl : ∀ {Ł} → #ℓ , #Ł ∣ var Ł <: var Ł
+  var-refl : ∀ {ℓ} → var ℓ :<: var ℓ
   static-refl : static :<: static
+
+  var-static : ∀ {ℓ} → var ℓ :<: static
   -- Values are less than both static and any variable
-  --val-var : ∀ {ℓ Ł} → #ℓ , #Ł ∣ val ℓ <: var Ł
+  val-var : ∀ {x ℓ} → val x :<: var ℓ
   val-static : ∀ {x} → val x :<: static
   -- A lower (newer) value is less than a larger (older) value
   val-val : ∀ {ℓ₁ ℓ₂} → asℕ ℓ₁ ≤ asℕ ℓ₂ → val ℓ₁ :<: val ℓ₂
 
+:<:-refl : ∀ {#x #ℓ} (ℓ : Life #x #ℓ) → ℓ :<: ℓ
+:<:-refl (var ℓ) = var-refl
+:<:-refl static = static-refl
+:<:-refl (val x) = val-val (≤-refl (asℕ x))
+
+:<:-antisym : ∀ {#x #ℓ} {ℓ₁ ℓ₂ : Life #x #ℓ} → ℓ₁ :<: ℓ₂ → ℓ₂ :<: ℓ₁ → ℓ₁ ≡ ℓ₂
+:<:-antisym var-refl var-refl = refl
+:<:-antisym static-refl static-refl = refl
+:<:-antisym var-static ()
+:<:-antisym val-var ()
+:<:-antisym val-static ()
+:<:-antisym (val-val x₁≤x₂) (val-val x₂≤x₁) = cong val (asℕ-inj (≤-antisym x₁≤x₂ x₂≤x₁))
+
+:<:-trans : ∀ {#x #ℓ} {ℓ₁ ℓ₂ ℓ₃ : Life #x #ℓ} → ℓ₁ :<: ℓ₂ → ℓ₂ :<: ℓ₃ → ℓ₁ :<: ℓ₃
+:<:-trans var-refl var-refl = var-refl
+:<:-trans var-refl var-static = var-static
+:<:-trans static-refl static-refl = static-refl
+:<:-trans var-static static-refl = var-static
+:<:-trans val-var var-refl = val-var
+:<:-trans val-var var-static = val-static
+:<:-trans val-static static-refl = val-static
+:<:-trans (val-val x₁≤x₂) val-var = val-var
+:<:-trans (val-val x₁≤x₂) val-static = val-static
+:<:-trans (val-val x₁≤x₂) (val-val x₂≤x₃) = val-val (≤-trans x₁≤x₂ x₂≤x₃)
+
+  {-
 --test-sublife-1 : 0 , 10 ∣ var fZ <: var fZ
 --test-sublife-1 = var-refl
 --test-sublife-2 : ¬ (0 , 10 ∣ var fZ <: var (fin 1))
@@ -105,3 +145,9 @@ test-sublife-9 : val {10} (fin 3) :<: val (fin 8)
 test-sublife-9 = val-val (s<s (s<s (s<s z<s)))
 test-sublife-10 : ¬ (val {10} (fin 8) :<: val (fin 3))
 test-sublife-10 (val-val (s<s (s<s (s<s (s<s ())))))
+-}
+
+subst-ℓ : ∀ {#x #ℓ #ℓ′} → Vec (Life #x #ℓ) #ℓ′ → Life 0 #ℓ′ → Life #x #ℓ
+subst-ℓ ℓs (var ℓ) = ℓs ! ℓ
+subst-ℓ ℓs static = static
+subst-ℓ ℓs (val ())

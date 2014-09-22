@@ -4,6 +4,7 @@ open import Util.Decidable
 open import Util.Fin
 open import Util.Product
 open import Util.Function
+open import Util.Empty
 
 module Util.Vec where
 
@@ -50,6 +51,18 @@ data Any {A : Set} (P : A → Set) : ∀ {n} → Vec A n → Set where
   Z : ∀ {n x} {xs : Vec A n} → P x → Any P (x ∷ xs)
   S : ∀ {n x} {xs : Vec A n} → Any P xs → Any P (x ∷ xs)
 
+Any-ix : ∀ {A P n} {xs : Vec A n} → Any P xs → Fin n
+Any-ix (Z px) = fZ
+Any-ix (S pf) = fS (Any-ix pf)
+
+Any-pf : ∀ {A P n} {xs : Vec A n} → Any P xs → Σ A ** (λ x →  P x)
+Any-pf (Z px) = _ , px
+Any-pf (S pf) = Any-pf pf
+
+All-Any : ∀ {A P Q n} {xs : Vec A n} → All P xs → Any Q xs → Σ A ** (λ x → P x × Q x)
+All-Any (p ∷ ps) (Z q) = _ , (p , q)
+All-Any (p ∷ ps) (S qs) = All-Any ps qs
+
 infixl 8 _!_
 _!_ : ∀ {A n} → Vec A n → Fin n → A
 (x ∷ xs) ! fZ = x
@@ -80,6 +93,21 @@ All2set′ : ∀ {A B n P xs ys x}
          → All2 {A} {B} P {n} xs ys → (i : Fin n) → P x (ys ! i) → All2 P (set xs i x) ys
 All2set′ (_ ∷ ps) fZ p = p ∷ ps
 All2set′ (p′ ∷ ps) (fS i) p = p′ ∷ All2set′ ps i p
+
+all? : ∀ {A n} {P : A → Set} (p? : Decidable P) → Decidable (All P {n})
+all? p? [] = yes []
+all? p? (x ∷ xs) with p? x | all? p? xs
+all? p? (x ∷ xs) | yes px | yes pxs = yes (px ∷ pxs)
+all? p? (x ∷ xs) | yes px | no ¬pxs = no (λ { (Hpx ∷ Hpxs) → ¬pxs Hpxs })
+all? p? (x ∷ xs) | no ¬px | IH = no (λ { (Hpx ∷ Hpxs) → ¬px Hpx })
+
+any? : ∀ {A n} {P : A → Set} (p? : Decidable P) → Decidable (Any P {n})
+any? p? [] = no (λ ())
+any? p? (x ∷ xs) with p? x
+any? p? (x ∷ xs) | yes px = yes (Z px)
+any? p? (x ∷ xs) | no ¬px with any? p? xs
+any? p? (x ∷ xs) | no ¬px | yes pxs = yes (S pxs)
+any? p? (x ∷ xs) | no ¬px | no ¬pxs = no (λ {(Z px) → ¬px px ; (S pxs) → ¬pxs pxs })
 
 _⊗_ : ∀ {n A B} → Vec (A → B) n → Vec A n → Vec B n
 [] ⊗ [] = []
@@ -153,10 +181,17 @@ range′ (S n) = fZ ∷ map fS (range′ n)
 range′-test : range′ 3 ≡ ([ fin 0 ,, fin 1 ,, fin 2 ])
 range′-test = refl
 
+map-!-comm : ∀ {A B n} (f : A → B) xs (ix : Fin n) → map f xs ! ix ≡ f (xs ! ix)
+map-!-comm f (x ∷ xs) fZ = refl
+map-!-comm f (x ∷ xs) (fS ix) = map-!-comm f xs ix
+
+range′-spec : ∀ {n} f → range′ n ! f ≡ f
+range′-spec fZ = refl
+range′-spec {S n} (fS f) rewrite map-!-comm fS (range′ n) f = cong fS (range′-spec f)
+
 range′′ : ∀ n m → Vec (Fin (plus n m)) n
 range′′ n m = map (expand m) (range′ n)
 
-{-
 take : ∀ {A m} n → Vec A (plus n m) → Vec A n
 take Z xs = []
 take (S n) (x ∷ xs) = x ∷ (take n xs)
@@ -165,6 +200,7 @@ drop : ∀ {A m} n → Vec A (plus n m) → Vec A m
 drop Z xs = xs
 drop (S n) (x ∷ xs) = drop n xs
 
+{-
 remove : ∀ {A n} → Vec A (S n) → Fin (S n) → Vec A n
 remove (x ∷ xs) fZ = xs
 remove (x ∷ xs) (fS i) = {!!}
@@ -191,3 +227,35 @@ data ↓xs {n} : ∀ {m} → ℕ → Vec (Fin (S n)) m → Vec (Fin n) m → Set
       → ↓xs c is js
       → ↓xs c (i ∷ is) (j ∷ js)
       -}
+
+      {-
+data FIsMax : ∀ n → Fin n → Set where
+  Z : FIsMax 1 fZ
+  S : ∀ {n f} → FIsMax n f → FIsMax (S n) (fS f)
+
+FIsMax? : ∀ n → (f : Fin n) → Dec (FIsMax n f)
+FIsMax? Z ()
+FIsMax? (S Z) fZ = yes Z
+FIsMax? (S (S n)) fZ = no (λ ())
+FIsMax? (S n) (fS f) with FIsMax? n f
+FIsMax? (S n) (fS f) | yes pf = yes (S pf)
+FIsMax? (S n) (fS f) | no ¬pf = no (λ { (S pf) → ¬pf pf })
+-}
+
+snoc-ismax : ∀ {A n} (xs : Vec A n) → (x : A) → (f : Fin (S n)) → FIsMax f → snoc xs x ! f ≡ x
+snoc-ismax [] x .fZ Z = refl
+snoc-ismax [] x ._ (S ())
+snoc-ismax (_ ∷ xs) x fZ ()
+snoc-ismax (_ ∷ xs) x (fS f) (S pf) = snoc-ismax xs x f pf
+
+-- snoc xs x ! f → xs ! ↓¬max f ¬pf
+snoc-notmax : ∀ {A n} (xs : Vec A n) (x : A) (f : Fin (S n)) (¬pf : ¬ (FIsMax f))
+            → snoc xs x ! f ≡ xs ! ↓¬max f ¬pf
+snoc-notmax [] x fZ ¬pf = exfalso (¬pf Z)
+snoc-notmax [] x (fS ()) ¬pf
+snoc-notmax (x′ ∷ xs) x fZ ¬pf = refl
+snoc-notmax (x′ ∷ xs) x (fS f) ¬pf = snoc-notmax xs x f (λ z → ¬pf (S z))
+
+!->→shrink : ∀ {A n} {x : A} {xs : Vec A n} {f : Fin (S n)} (f>0 : fZ F< f)
+           → (x ∷ xs) ! f ≡ xs ! >→shrink f f>0
+!->→shrink z<s = refl

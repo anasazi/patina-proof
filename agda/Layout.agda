@@ -52,11 +52,14 @@ data ↓#a-l {#x #a} : ℕ → Layout #x (S #a) → Layout #x #a → Set where
   ptr : ∀ {c r r′} → mlift (↓#a-r c) r r′ → ↓#a-l c (ptr r) (ptr r′)
   rec : ∀ {n c ls ls′} → All2 (↓#a-l c) {n} ls ls′ → ↓#a-l c (rec ls) (rec ls′)
 
-data void-layout {#x #a #ℓ} : Type #ℓ → Layout #x #a → Set where
-  int : void-layout int (int none)
-  ~⊥ : ∀ {τ} → void-layout (~ τ) (ptr none)
-  &⊥ : ∀ {ℓ μ τ} → void-layout (& ℓ μ τ) (ptr none)
-  opt : ∀ {τ l} → void-layout τ l → void-layout (opt τ) (rec ([ int none ,, l ]))
+data void-layout {#s #x #a} (§ : Structs #s) : Type #s #x → Layout #x #a → Set where
+  int : void-layout § int (int none)
+  ~⊥ : ∀ {τ} → void-layout § (~ τ) (ptr none)
+  &⊥ : ∀ {ℓ μ τ} → void-layout § (& ℓ μ τ) (ptr none)
+  opt : ∀ {τ l} → void-layout § τ l → void-layout § (opt τ) (rec ([ int none ,, l ]))
+  struct : ∀ {s ls}
+         → All2 (void-layout §) (field-types § s) ls
+         → void-layout § (struct s) (rec ls)
 
 Stack : ℕ → ℕ → Set
 Stack #x #a = Vec (Layout #x #a) #x
@@ -80,23 +83,24 @@ data _⊢_≔_⇒_ {#x #a} : Mem #x #a → Route #x #a → Layout #x #a → Mem 
   ∙ : ∀ {M r n f ls l M′} → M ⊢ r ⇒ rec ls → M ⊢ r ≔ rec (set ls f l) ⇒ M′ → M ⊢ < n > r ∙ f ≔ l ⇒ M′
 
 -- Moving read
-data _⊢_∶_⇒_,_ {#x #a #ℓ} : Mem #x #a → Route #x #a → Type #ℓ → Layout #x #a → Mem #x #a → Set where
+data _,_⊢_∶_⇒_,_ {#s #x #a} (§ : Structs #s) : Mem #x #a → Route #x #a
+                          → Type #s #x → Layout #x #a → Mem #x #a → Set where
   copy : ∀ {M r τ l}
-       → τ Copy
+       → § ⊢ τ Copy
        → M ⊢ r ⇒ l
-       → M ⊢ r ∶ τ ⇒ l , M
+       → § , M ⊢ r ∶ τ ⇒ l , M
   move : ∀ {M r τ l l′ M′}
-       → τ Affine
+       → § ⊢ τ Affine
        → M ⊢ r ⇒ l
-       → void-layout τ l′
+       → void-layout § τ l′
        → M ⊢ r ≔ l′ ⇒ M′
-       → M ⊢ r ∶ τ ⇒ l , M′
+       → § , M ⊢ r ∶ τ ⇒ l , M′
 
-test-moving-read-1 : (([ int (just 1) ]) , [])
+test-moving-read-1 : [] , (([ int (just 1) ]) , [])
                    ⊢ stack fZ ∶ int {0} ⇒ int (just 1)
                    , (([ int (just 1) ]) , [])
 test-moving-read-1 = copy int stack
-test-moving-read-2 : (([ ptr (just (heap fZ)) ]) , ([ int none ]))
+test-moving-read-2 : [] , (([ ptr (just (heap fZ)) ]) , ([ int none ]))
                    ⊢ stack fZ ∶ ~ {0} int ⇒ ptr (just (heap fZ))
                    , (([ ptr none ]) , ([ int none ]))
 test-moving-read-2 = move ~Aff stack ~⊥ stack
@@ -131,51 +135,58 @@ _⊢_mem-ok : ∀ {#x #a #ℓ} → Context #ℓ #x → Mem #x #a → Set
 -}
 
 -- Typing for layouts
-data _,_⊢_∶_layout {#x #a} (Γ : Cxt #x) (Σ : Vec (Type #x) #a)
-                   : Layout #x #a → Type #x → Set where
+data _,_,_⊢_∶_layout {#s #x #a} (§ : Structs #s) (Γ : Cxt #s #x) (Σ : Vec (Type #s #x) #a)
+                   : Layout #x #a → Type #s #x → Set where
   -- Integer slots can only be integers
-  int : ∀ {n?} → Γ , Σ ⊢ int n? ∶ int layout
+  int : ∀ {n?} → § , Γ , Σ ⊢ int n? ∶ int layout
   -- A pointer slot can be either kind of pointer (~ or &)
   -- If it is initialized, then it points to whatever the type of the wrapped route is
   -- If it is uninitialized, then it can point to anything
-  ptr~ : ∀ {r τ} → Γ , Σ ⊢ r ∶ τ route → Γ , Σ ⊢ ptr (just r) ∶ ~ τ layout
-  ⊥~ : ∀ {τ} → Γ , Σ ⊢ ptr none ∶ ~ τ layout
-  ptr& : ∀ {r ℓ μ τ} → Γ , Σ ⊢ r ∶ τ route → Γ , Σ ⊢ ptr (just r) ∶ & ℓ μ τ layout
-  ⊥& : ∀ {ℓ μ τ} → Γ , Σ ⊢ ptr none ∶ & ℓ μ τ layout
+  ptr~ : ∀ {r τ} → § , Γ , Σ ⊢ r ∶ τ route → § , Γ , Σ ⊢ ptr (just r) ∶ ~ τ layout
+  ⊥~ : ∀ {τ} → § , Γ , Σ ⊢ ptr none ∶ ~ τ layout
+  ptr& : ∀ {r ℓ μ τ} → § , Γ , Σ ⊢ r ∶ τ route → § , Γ , Σ ⊢ ptr (just r) ∶ & ℓ μ τ layout
+  ⊥& : ∀ {ℓ μ τ} → § , Γ , Σ ⊢ ptr none ∶ & ℓ μ τ layout
   -- Options are represented as a int and a payload slot, so we just check the pieces
-  opt : ∀ {τ d p} → Γ , Σ ⊢ d ∶ int layout → Γ , Σ ⊢ p ∶ τ layout
-      → Γ , Σ ⊢ rec ([ d ,, p ]) ∶ opt τ layout
+  opt : ∀ {τ d p} → § , Γ , Σ ⊢ d ∶ int layout → § , Γ , Σ ⊢ p ∶ τ layout
+      → § , Γ , Σ ⊢ rec ([ d ,, p ]) ∶ opt τ layout
+  struct : ∀ {s ls}
+         → All2 (λ l τ → § , Γ , Σ ⊢ l ∶ τ layout) ls (field-types § s)
+         → § , Γ , Σ ⊢ rec ls ∶ struct s layout
 
-_,_⊢_mem : ∀ {#x #a} → Cxt #x → Vec (Type #x) #a → Mem #x #a → Set
-Γ , Σ ⊢ St , H mem = All2 (λ l τ → Γ , Σ ⊢ l ∶ τ layout) St Γ
-                   × All2 (λ l τ → Γ , Σ ⊢ l ∶ τ layout) H Σ
+_,_,_⊢_mem : ∀ {#s #x #a} → Structs #s → Cxt #s #x → Vec (Type #s #x) #a → Mem #x #a → Set
+§ , Γ , Σ ⊢ St , H mem = All2 (λ l τ → § , Γ , Σ ⊢ l ∶ τ layout) St Γ
+                       × All2 (λ l τ → § , Γ , Σ ⊢ l ∶ τ layout) H Σ
 
 -- Reading preserves types
-read-preservation : ∀ {#x #a r l Γ Σ} {M : Mem #x #a} {τ : Type #x}
-                  → Γ , Σ ⊢ M mem
-                  → Γ , Σ ⊢ r ∶ τ route
+read-preservation : ∀ {#s #x #a r l Γ Σ} {§ : Structs #s} {M : Mem #x #a} {τ : Type #s #x}
+                  → § , Γ , Σ ⊢ M mem
+                  → § , Γ , Σ ⊢ r ∶ τ route
                   → M ⊢ r ⇒ l
-                  → Γ , Σ ⊢ l ∶ τ layout
+                  → § , Γ , Σ ⊢ l ∶ τ layout
 read-preservation (⊢S , ⊢H) (stack {x}) stack = ⊢S All2! x
 read-preservation (⊢S , ⊢H) (heap {a}) heap = ⊢H All2! a
 read-preservation ⊢M (disc r∶opt-τ) (∙ r⇒l) with read-preservation ⊢M r∶opt-τ r⇒l
 ... | opt ∙0∶int ∙1∶τ = ∙0∶int
 read-preservation ⊢M (pay r∶opt-τ) (∙ r⇒l) with read-preservation ⊢M r∶opt-τ r⇒l
 ... | opt ∙0∶int ∙1∶τ = ∙1∶τ
+read-preservation ⊢M (∙ {_} {f} r∶struct-s) (∙ r⇒l) with read-preservation ⊢M r∶struct-s r⇒l
+... | struct ls∶τs = ls∶τs All2! f
 
 -- Writing something of the same type as the route does not change the type of memory
-write-preservation : ∀ {#x #a r l Γ Σ} {M M′ : Mem #x #a} {τ : Type #x}
-                   → Γ , Σ ⊢ M mem
-                   → Γ , Σ ⊢ r ∶ τ route
-                   → Γ , Σ ⊢ l ∶ τ layout
+write-preservation : ∀ {#s #x #a r l Γ Σ} {§ : Structs #s} {M M′ : Mem #x #a} {τ : Type #s #x}
+                   → § , Γ , Σ ⊢ M mem
+                   → § , Γ , Σ ⊢ r ∶ τ route
+                   → § , Γ , Σ ⊢ l ∶ τ layout
                    → M ⊢ r ≔ l ⇒ M′
-                   → Γ , Σ ⊢ M′ mem
+                   → § , Γ , Σ ⊢ M′ mem
 write-preservation (⊢S , ⊢H) (stack {x}) l∶τ stack = All2set′ ⊢S x l∶τ , ⊢H
 write-preservation (⊢S , ⊢H) (heap {a}) l∶τ heap = ⊢S , All2set′ ⊢H a l∶τ
 write-preservation ⊢M (disc r∶opt-τ) l∶int (∙ r⇒ls r≔ls′) with read-preservation ⊢M r∶opt-τ r⇒ls
 ... | opt ∙0∶int ∙1∶τ = write-preservation ⊢M r∶opt-τ (opt l∶int ∙1∶τ) r≔ls′
 write-preservation ⊢M (pay r∶opt-τ) l∶τ (∙ r⇒ls r≔ls′) with read-preservation ⊢M r∶opt-τ r⇒ls
 ... | opt ∙0:int ∙1:τ = write-preservation ⊢M r∶opt-τ (opt ∙0:int l∶τ) r≔ls′
+write-preservation ⊢M (∙ {_} {f} r∶struct-s) l∶s∙f (∙ r⇒ls r≔ls′) with read-preservation ⊢M r∶struct-s r⇒ls
+... | struct ls∶τs = write-preservation ⊢M r∶struct-s (struct (All2set′ ls∶τs f l∶s∙f)) r≔ls′
 
 data _⊢_init {#x #a} (M : Mem #x #a) : Layout #x #a → Set where
   int : ∀ {n} → M ⊢ int (just n) init

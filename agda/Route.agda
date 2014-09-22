@@ -36,12 +36,26 @@ data ↓#a-r {#x #a} : ℕ → Route #x (S #a) → Route #x #a → Set where
   heap : ∀ {c a a′} → ↓ c a a′ → ↓#a-r c (heap a) (heap a′)
   ∙ : ∀ {c n r r′ f} → ↓#a-r c r r′ → ↓#a-r c (< n > r ∙ f) (< n > r′ ∙ f)
 
-{-
-Typing for Routes. It is similar to typing for Paths.
-However, note the additional constructors for the two components of Options.
--}
-data _,_⊢_∶_route {#x #a} (Γ : Cxt #x) (Σ : Vec (Type #x) #a) : Route #x #a → Type #x → Set where
+data _,_⊢_∶_route {#s #u #x #ℓ #a} (Γ : Cxt #s #u #x #ℓ) (Σ : Vec (Type #s #u #x #ℓ) #a)
+                  : Route #x #a → Type #s #u #x #ℓ → Set where
   stack : ∀ {x} → Γ , Σ ⊢ stack x ∶ Γ ! x route
   heap : ∀ {a} → Γ , Σ ⊢ heap a ∶ Σ ! a route
   disc : ∀ {r τ} → Γ , Σ ⊢ r ∶ opt τ route → Γ , Σ ⊢ < 2 > r ∙ fin 0 ∶ int route
   pay : ∀ {r τ} → Γ , Σ ⊢ r ∶ opt τ route → Γ , Σ ⊢ < 2 > r ∙ fin 1 ∶ τ route
+  ∙ : ∀ {n r f τs} → Γ , Σ ⊢ r ∶ rec τs route → Γ , Σ ⊢ < n > r ∙ f ∶ τs ! f route
+
+  {-
+{-
+Typing for Routes. It is similar to typing for Paths.
+However, note the additional constructors for the two components of Options.
+-}
+data _,_,_⊢_∶_route {#s #x #a} (§ : Structs #s) (Γ : Cxt #s #x) (Σ : Vec (Type #s #x) #a)
+                  : Route #x #a → Type #s #x → Set where
+  stack : ∀ {x} → § , Γ , Σ ⊢ stack x ∶ Γ ! x route
+  heap : ∀ {a} → § , Γ , Σ ⊢ heap a ∶ Σ ! a route
+  disc : ∀ {r τ} → § , Γ , Σ ⊢ r ∶ opt τ route → § , Γ , Σ ⊢ < 2 > r ∙ fin 0 ∶ int route
+  pay : ∀ {r τ} → § , Γ , Σ ⊢ r ∶ opt τ route → § , Γ , Σ ⊢ < 2 > r ∙ fin 1 ∶ τ route
+  ∙ : ∀ {s f r}
+    → § , Γ , Σ ⊢ r ∶ struct s route
+    → § , Γ , Σ ⊢ < Struct.#fields (§ ! s) > r ∙ f ∶ field-types § s ! f route
+-}

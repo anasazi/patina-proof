@@ -20,8 +20,8 @@ module Util.Equality where
   cong : ∀ {A B : Set} (f : A → B) {x y} → x ≡ y → f x ≡ f y
   cong f refl = refl
 
-  _~_ : ∀ {A : Set} {x y z : A} → x ≡ y → y ≡ z → x ≡ z
-  refl ~ refl = refl
+  trans : ∀ {A : Set} {x y z : A} → x ≡ y → y ≡ z → x ≡ z
+  trans refl refl = refl
 
   subst : ∀ {a b} {A : Set a} (B : A → Set b) {x y} → x ≡ y → B x → B y
   subst B refl b = b

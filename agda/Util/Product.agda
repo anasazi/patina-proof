@@ -15,6 +15,9 @@ infixr 3 _×_
 _×_ : ∀ {α β} → Set α → Set β → Set (α ⊔ β)
 A × B = Σ A ** (λ _ → B)
 
+swap : ∀ {α β} {A : Set α} {B : Set β} → A × B → B × A
+swap (fst , snd) = snd , fst
+
 _***_ : {A₁ A₂ : Set} {B₁ : A₁ → Set} {B₂ : A₂ → Set}
         (f : A₁ → A₂) → (∀ {a} → B₁ a → B₂ (f a)) → Σ A₁ ** B₁ → Σ A₂ ** B₂
 (f *** g) (x , y) = f x , g y
