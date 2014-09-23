@@ -13,16 +13,17 @@ data Fin : ℕ → Set where
 fS-inj : ∀ {n} {a b : Fin n} → fS a ≡ fS b → a ≡ b
 fS-inj refl = refl
 
-_=Fin=_ : ∀ {n} (a b : Fin n) → Dec (a ≡ b)
-fZ =Fin= fZ = yes refl
-fZ =Fin= fS b = no (λ ())
-fS a =Fin= fZ = no (λ ())
-fS a =Fin= fS b with a =Fin= b
-fS a =Fin= fS b | yes pf = yes (cong fS pf)
-fS a =Fin= fS b | no ¬pf = no (¬pf ∘ fS-inj)
+instance
+  _=Fin=_ : ∀ {n} (a b : Fin n) → Dec (a ≡ b)
+  fZ =Fin= fZ = yes refl
+  fZ =Fin= fS b = no (λ ())
+  fS a =Fin= fZ = no (λ ())
+  fS a =Fin= fS b with a =Fin= b
+  fS a =Fin= fS b | yes pf = yes (cong fS pf)
+  fS a =Fin= fS b | no ¬pf = no (¬pf ∘ fS-inj)
 
-EqFin : ∀ {n} → Eq (Fin n)
-EqFin = record { _==_ = _=Fin=_ }
+  EqFin : ∀ {n} → Eq (Fin n)
+  EqFin = record { _==_ = _=Fin=_ }
 
 ℕ→Fin : ∀ {m} (n : ℕ) {n<m : IsTrue (lessNat n m)} → Fin m
 ℕ→Fin {Z} n {}

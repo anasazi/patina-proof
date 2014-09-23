@@ -49,6 +49,7 @@ private
   val-inj : ∀ {#x} {i j : Fin #x} → val i ≡ val j → i ≡ j
   val-inj refl = refl
 
+instance
   _=life=_ : ∀ {#x} → (ℓ₁ ℓ₂ : Life #x) → Dec (ℓ₁ ≡ ℓ₂)
   static =life= static = yes refl
   static =life= val x₂ = no (λ ())
@@ -57,8 +58,8 @@ private
   val x₁ =life= val .x₁ | yes refl = yes refl
   val x₁ =life= val x₂ | no neq = no (neq ∘ val-inj)
 
-EqLife : ∀ {#x} → Eq (Life #x)
-EqLife = record { _==_ = _=life=_ }
+  EqLife : ∀ {#x} → Eq (Life #x)
+  EqLife = record { _==_ = _=life=_ }
 
 -- upshifting and downshifting for lifetimes
 ↑#x-ℓ : ∀ {#x} → ℕ → Life #x → Life (S #x)

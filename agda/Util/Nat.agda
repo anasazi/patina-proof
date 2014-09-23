@@ -19,16 +19,17 @@ module Util.Nat where
   S-inj : ∀ {n m} → S n ≡ S m → n ≡ m
   S-inj refl = refl
 
-  _=ℕ=_ : (a b : ℕ) → Dec (a ≡ b)
-  Z =ℕ= Z = yes refl
-  Z =ℕ= S b = no (λ ())
-  S a =ℕ= Z = no (λ ())
-  S a =ℕ= S b with a =ℕ= b
-  ... | yes p = yes (cong S p)
-  ... | no p = no (p ∘ S-inj)
+  instance
+    _=ℕ=_ : (a b : ℕ) → Dec (a ≡ b)
+    Z =ℕ= Z = yes refl
+    Z =ℕ= S b = no (λ ())
+    S a =ℕ= Z = no (λ ())
+    S a =ℕ= S b with a =ℕ= b
+    ... | yes p = yes (cong S p)
+    ... | no p = no (p ∘ S-inj)
 
-  EqNat : Eq ℕ
-  EqNat = record { _==_ = _=ℕ=_ }
+    EqNat : Eq ℕ
+    EqNat = record { _==_ = _=ℕ=_ }
 
   plus-0-r : ∀ n → plus n 0 ≡ n
   plus-0-r Z = refl
