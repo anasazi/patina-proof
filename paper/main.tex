@@ -17,6 +17,7 @@
 \newcommand{\slot}{\textrm{slot}}
 \newcommand{\uninit}{\textrm{uninit}}
 \newcommand{\hole}{\textrm{hole}}
+\newcommand{\init}{\textrm{init}}
 
 \newcommand{\Own}[1]{\sim {#1}}
 \newcommand{\Ref}[3]{\&\ {#1}\ {#2}\ {#3}}
@@ -45,6 +46,8 @@
 \newcommand{\ARType}[5]{\RTType{{#1}}{{#2}}{{#3}\ {#4}}{{#5}}}
 \newcommand{\Read}[4]{\textsc{read}({#1},{#2},{#3},{#4})}
 \newcommand{\HWF}[3]{\vdash {#1} : {#2} ; {#3}}
+\newcommand{\YWF}[2]{\vdash {#1} : {#2}}
+\newcommand{\Shallow}[4]{\textsc{shallow}({#1},{#2},{#3},{#4})}
 
 \section{Syntax}
 
@@ -268,5 +271,166 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
   Mostly straightforward induction on $\ARType{\Sigma}{\Psi}{\alpha}{r}{\tau}$.
   Utilizes Read Uniqueness in the \textsc{RD-PAY} case.
 \end{proof}
+
+\section{Initialization Information}
+
+\subsection{Typing for Initialization Information}
+
+\begin{figure}[H]
+  \begin{mathpar}
+    \infer[HT-UNINT]
+      { }
+      {\Type{\Upsilon}{\uninit}{\zah}}
+
+    \infer[HT-UNREF]
+      { }
+      {\Type{\Upsilon}{\uninit}{\Ref{\ell}{q}{\tau}}}
+
+    \infer[HT-UNOWN]
+      { }
+      {\Type{\Upsilon}{\uninit}{\Own{\tau}}}
+
+    \infer[HT-UNVAR]
+      { }
+      {\Type{\Upsilon}{\uninit}{\Var{\tau_i}{n}}}
+
+    \infer[HT-INT]
+      { }
+      {\Type{\Upsilon}{\zah}{\zah}}
+
+    \infer[HT-REF]
+      { }
+      {\Type{\Upsilon}{\RefVal{q}{\tau}}{\Ref{\ell}{q}{\tau}}}
+
+    \infer[HT-OWN]
+      {\Type{\Upsilon}{\sigma}{\tau}}
+      {\Type{\Upsilon}{\Own{\sigma}}{\Own{\tau}}}
+
+    \infer[HT-VAR]
+      { }
+      {\Type{\Upsilon}{\Var{\tau_i}{n}}{\Var{\tau_i}{n}}}
+  \end{mathpar}
+  \caption{Hole Typing}
+\end{figure}
+
+\begin{figure}[H]
+  \begin{mathpar}
+    \infer[SH-HOLE]
+      {\Type{\Upsilon}{h}{\tau}}
+      {\Type{\Upsilon}{\Hole{h}}{\tau}}
+
+    \infer[SH-REC]
+      {\forall i.\ \Type{\Upsilon}{\sigma_i}{\tau_i}}
+      {\Type{\Upsilon}{\Rec{\sigma_i}{n}}{\Rec{\tau_i}{n}}}
+
+    \infer[SH-ROLL]
+      {\tau = \Fix{X}{\tau'} \\ \Type{\Upsilon}{\sigma}{\Subst{X}{\tau}{\tau'}}}
+      {\Type{\Upsilon}{\Roll{\tau}{\sigma}}{\tau}}
+  \end{mathpar}
+  \caption{Shape Typing}
+\end{figure}
+
+\subsection{Initialization Coherence}
+
+\begin{figure}[H]
+  \begin{mathpar}
+    \infer[LS-VOID]
+      { }
+      {\Type{H}{\Slot{\void}}{\Hole{\uninit}}}
+
+    \infer[LS-INT]
+      { }
+      {\Type{H}{\Slot{z}}{\Hole{\zah}}}
+
+    \infer[LS-REF]
+      {\Read{H}{\alpha}{r}{l} \\ TODO ?init(H,l)? }
+      {\Type{H}{\Slot{\Ref{q}{\alpha}{r}}}{\Hole{\RefVal{q}{\tau}}}}
+
+    \infer[LS-OWN]
+      {\Read{H}{\alpha}{r}{l} \\ \Type{H}{l}{\sigma}}
+      {\Type{H}{\Slot{\OwnVal{\alpha}{r}}}{\Hole{\Own{\sigma}}}}
+
+    \infer[LS-VOIDVAR]
+      { }
+      {\Type{H}{\VarVal{\void}{\Slot{\void}}{n}}{\Hole{\uninit}}}
+
+    \infer[LS-UNVAR]
+      {TODO ?droppable(l)?}
+      {\Type{H}{\VarVal{i}{l}{n}}{\Hole{\uninit}}}
+
+    \infer[LS-VAR]
+      {TODO ?init(H,l)?}
+      {\Type{H}{\VarVal{i}{l}{n}}{\hole{\Var{\tau_i}{n}}}}
+
+    \infer[LS-REC]
+      {\forall i.\ \Type{H}{l_i}{\sigma_i}}
+      {\Type{H}{\Rec{l_i}{n}}{\Rec{\sigma_i}{n}}}
+
+    \infer[LS-ROLL]
+      {\Type{H}{l}{\sigma}}
+      {\Type{H}{\Roll{\tau}{l}}{\Roll{\tau}{\sigma}}}
+
+  \end{mathpar}
+  \caption{Layout Shaping}
+\end{figure}
+
+\begin{figure}[H]
+  \begin{mathpar}
+    \mprset{flushleft}
+    \infer
+      {\dom(\Gamma) = \dom(\Upsilon) \\\\
+       \forall x \in \dom(\Gamma).\ \Gamma(x)\ \textrm{closed} \\\\
+       \forall x \in \dom(\Gamma).\ \Type{\Upsilon}{\Upsilon(x)}{\Gamma(x)}
+      }
+      {\YWF{\Upsilon}{\Gamma}}
+
+    \infer
+      {\dom(V) = \dom(\Upsilon) \\\\
+       \forall x \in \dom(V).\ \Type{H}{H(V(x))}{\Upsilon(x)}
+      }
+      {\Type{V}{H}{\Upsilon}}
+  \end{mathpar}
+  \caption{Initialization Information Well Formed}
+\end{figure}
+
+\subsection{Shallow Initialization / Shape Reading}
+
+\begin{figure}[H]
+  \mprset{flushleft}
+  \infer {
+    \init(\zah) = \Hole{\zah} \\\\
+    \init(\Own{\tau}) = \Hole{\Own{\init(\tau)}} \\\\
+    \init(\Ref{\ell}{q}{\tau}) = \Hole{\RefVal{q}{\tau}} \\\\
+    \init(\Var{\tau_i}{n}) = \Hole{\Var{\tau_i}{n}} \\\\
+    \init(\Rec{\tau_i}{n}) = \Rec{\init(\tau_i)}{n} \\\\
+    \init(\Fix{X}{\tau}) = \Roll{\Fix{X}{\tau}}{\init(\Subst{X}{\Fix{X}{\tau}}{\tau})}
+  }{}
+  \caption{Initialized Shape of Closed Types}
+\end{figure}
+
+\begin{figure}[H]
+  \begin{mathpar}
+    \infer[SI-BASE]
+      {\Upsilon(x) = \sigma}
+      {\Shallow{\Upsilon}{x}{\Base}{\sigma}}
+
+    \infer[SI-PROJ]
+      {\Shallow{\Upsilon}{x}{p}{\Rec{\sigma_i}{n}}}
+      {\Shallow{\Upsilon}{x}{\Proj{p}{n}{i}}{\sigma_i}}
+
+    \infer[SI-UNROLL]
+      {\Shallow{\Upsilon}{x}{p}{\Roll{\tau'}{\sigma}}}
+      {\Shallow{\Upsilon}{x}{\Unroll{\tau}{p}}{\sigma}}
+
+    \infer[SI-DEOWN]
+      {\Shallow{\Upsilon}{x}{p}{\Hole{\Own{\sigma}}}}
+      {\Shallow{\Upsilon}{x}{\Deref{p}}{\sigma}}
+
+    \infer[SI-DEREF]
+      {\Shallow{\Upsilon}{x}{p}{\Hole{\RefVal{q}{\tau}}}}
+      {\Shallow{\Upsilon}{x}{\Deref{p}}{\sigma}}
+  \end{mathpar}
+  \caption{Shallowly Initialized / Read Shape}
+\end{figure}
 
 \end{document}
