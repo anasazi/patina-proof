@@ -268,15 +268,74 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
     By induction, $\Roll{\tau'}{l} = \Roll{\tau''}{l'}$. Thus, $l = l'$.
 \end{proof}
 
+\pagebreak % TODO remove? temporary for avoiding orphan
+
 \begin{lem}[Read Safety]
   $\HWF{H}{\Sigma}{\Psi}\ \land\ \ARType{\Sigma}{\Psi}{\alpha}{r}{\tau}\ \Rightarrow\ 
   \exists l. \Read{H}{\alpha}{r}{l} \land \RTType{\Sigma}{\Psi}{l}{\tau}$.
 \end{lem}
 
 \begin{proof}
-  TODO transcribe from paper.
-  Mostly straightforward induction on $\ARType{\Sigma}{\Psi}{\alpha}{r}{\tau}$.
-  Utilizes Read Uniqueness in the \textsc{RD-PAY} case.
+  %TODO transcribe from paper.
+  %Mostly straightforward induction on $\ARType{\Sigma}{\Psi}{\alpha}{r}{\tau}$.
+  %Utilizes Read Uniqueness in the \textsc{RD-PAY} case.
+  Induction on the derivation of $\ARType{\Sigma}{\Psi}{\alpha}{r}{\tau}$.
+  
+  \textsc{Case RT-BASE}:
+    Then $r = \Base$ and $\Sigma(\alpha) = \tau$.
+
+    We know $\dom(H) = \dom(\Sigma)$ from $\HWF{H}{\Sigma}{\Psi}$.
+    Thus, $\exists l.\ H(\alpha) = l$.
+
+    Then $\Read{H}{\alpha}{\Base}{H(\alpha)}$ by \textsc{RD-BASE}.
+
+    We also know $\RTType{\Sigma}{\Psi}{H(\alpha)}{\Sigma(\alpha)}$ from $\HWF{H}{\Sigma}{\Psi}$.
+
+  \textsc{Case RT-PROJ}:
+    Then $r = \Proj{r'}{n}{i}$, $\tau = \tau_i$,
+    and $\ARType{\Sigma}{\Psi}{\alpha}{r'}{\Rec{\tau_i}{n}}$.
+
+    By induction on $\ARType{\Sigma}{\Psi}{\alpha}{r'}{\Rec{\tau_i}{n}}$,
+    $\exists l.\ \Read{H}{\alpha}{r'}{l}\ \land\ \RTType{\Sigma}{\Psi}{l}{\Rec{\tau_i}{n}}$.
+
+    By inversion via \textsc{LT-REC} on $\RTType{\Sigma}{\Psi}{l}{\Rec{\tau_i}{n}}$, 
+    $l = \Rec{l_i}{n}$ and $\forall i.\ \RTType{\Sigma}{\Psi}{l_i}{\tau_i}$.
+
+    By applying \textsc{RD-PROJ} to $\Read{H}{\alpha}{r'}{\Rec{l_i}{n}}$,
+    we have $\Read{H}{\alpha}{\Proj{r'}{n}{i}}{l_i}$.
+
+  \textsc{Case RT-PAY}:
+    Then $r = \Pay{r'}$, $\tau = \tau_i$, $\Psi(\alpha, r')=i$,
+    and $\ARType{\Sigma}{\Psi}{\alpha}{r'}{\Var{\tau_i}{n}}$.
+
+    By induction on $\ARType{\Sigma}{\Psi}{\alpha}{r'}{\Var{\tau_i}{n}}$,
+    $\exists l.\ \Read{H}{\alpha}{r'}{l}\ \land\ \RTType{\Sigma}{\Psi}{l}{\Var{\tau_i}{n}}$.
+
+    From $\HWF{H}{\Sigma}{\Psi}$ and $\Psi(\alpha, r') = i$,
+    we have $\Read{H}{\alpha}{r'}{\VarVal{i}{l'}{n'}}$.
+
+    By Read Uniqueness, $l = \VarVal{i}{l'}{n}$.
+    Note $n = n'$ due to $\RTType{\Sigma}{\Psi}{\VarVal{i}{l'}{n'}}{\Var{\tau_i}{n}}$.
+
+    By inversion via \textsc{LT-VAR} on $\RTType{\Sigma}{\Psi}{\VarVal{i}{l'}{n}}{\Var{\tau_i}{n}}$,
+    we have $\RTType{\Sigma}{\Psi}{l'}{\tau_i}$.
+
+    By applying \textsc{RD-PAY} to $\Read{H}{\alpha}{r'}{\VarVal{i}{l'}{n}}$,
+    we have $\Read{H}{\alpha}{\Pay{r'}}{l'}$.
+
+  \textsc{Case RT-UNROLL}:
+    Then $r = \Unroll{\Fix{X}{\tau'}}{r'}$, $\tau = \Subst{X}{\Fix{X}{\tau'}}{\tau'}$,
+    and $\ARType{\Sigma}{\Psi}{\alpha}{r'}{\Fix{X}{\tau'}}$.
+
+    By induction on $\ARType{\Sigma}{\Psi}{\alpha}{r'}{\Fix{X}{\tau'}}$,
+    we have $\exists l.\ \Read{H}{\alpha}{r'}{l}\ \land\ \RTType{\Sigma}{\Psi}{l}{\Fix{X}{\tau'}}$.
+
+    By inversion via \textsc{LT-ROLL} on $\RTType{\Sigma}{\Psi}{l}{\Fix{X}{\tau'}}$,
+    we have $l = \Roll{\Fix{X}{\tau'}}{l'}$ and
+    $\RTType{\Sigma}{\Psi}{l'}{\Subst{X}{\Fix{X}{\tau'}}{\tau'}}$.
+
+    By applying \textsc{RD-UNROLL} to $\Read{H}{\alpha}{r'}{\Roll{\Fix{X}{\tau'}}{l'}}$,
+    we have\\ $\Read{H}{\alpha}{\Unroll{\Fix{X}{\tau'}}{r'}}{l'}$.
 \end{proof}
 
 \section{Initialization Information}
@@ -502,6 +561,8 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
   TODO. Probably just straightforward induction.
 \end{proof}
 
+\pagebreak % TODO remove?
+
 \begin{lem}[Path Type Preservation]
   $\HWF{H}{\Sigma}{\Psi}\ \land\ \SWF{\Gamma}{V}{\Sigma}\ \land\ \\
    \PType{\Gamma}{x}{p}{\tau}\ \land\ \PEval{V}{H}{x}{p}{\alpha}{r}\ \Rightarrow\
@@ -509,9 +570,51 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
 \end{lem}
 
 \begin{proof}
-  TODO transcribe from paper. 
-  Base, Proj, and Unroll cases immediate by inversion and induction.
-  Deown/ref cases use read safety and read uniqueness as well.
+%  TODO transcribe from paper. 
+%  Base, Proj, and Unroll cases immediate by inversion and induction.
+%  Deown/ref cases use read safety and read uniqueness as well.
+  Induction on $\PEval{V}{H}{x}{p}{\alpha}{r}$.
+
+  \textsc{Case PE-BASE}:
+    Then $p = \Base$, $r = \Base$, and $V(x) = \alpha$.
+
+    By inversion via \textsc{PT-BASE} on $\PType{\Gamma}{x}{\Base}{\tau}$, we have $\Gamma(x)=\tau$.
+
+    We know $\Gamma(x) = \Sigma(V(x))$ from $\SWF{\Gamma}{V}{\Sigma}$.
+    Thus, $\tau = \Sigma(\alpha)$.
+
+    By applying \textsc{RT-BASE}, we have $\ARType{\Sigma}{\Psi}{\alpha}{\Base}{\tau}$.
+
+  \textsc{Case PE-DEOWN}: TODO
+
+  \textsc{Case PE-DEREF}: TODO
+
+  \textsc{Case PE-PROJ}:
+    Then $p = \Proj{p'}{n}{i}$, $r = \Proj{r'}{n}{i}$, and $\PEval{V}{H}{x}{p'}{\alpha}{r'}$.
+
+    By inversion via \textsc{PT-PROJ} on $\PType{\Gamma}{x}{\Proj{p'}{n}{i}}{\tau}$,
+    we have $\tau = \tau_i$ and $\PType{\Gamma}{x}{p'}{\Rec{\tau_i}{n}}$.
+
+    By induction with $\PType{\Gamma}{x}{p'}{\Rec{\tau_i}{n}}$
+    and $\PEval{V}{H}{x}{p'}{\alpha}{r'}$,
+    we have $\ARType{\Sigma}{\Psi}{\alpha}{r'}{\Rec{\tau_i}{n}}$.
+
+    By applying \textsc{RT-PROJ} to $\ARType{\Sigma}{\Psi}{\alpha}{r'}{\Rec{\tau_i}{n}}$,
+    we have $\ARType{\Sigma}{\Psi}{\alpha}{\Proj{r'}{n}{i}}{\tau_i}$.
+
+  \textsc{Case PE-UNROLL}:
+    Then $p = \Unroll{\Fix{X}{\tau'}}{p'}$, $r = \Unroll{\Fix{X}{\tau'}}{r'}$,
+    and $\PEval{V}{H}{x}{p'}{\alpha}{r'}$.
+
+    By inversion via \textsc{PT-UNROLL} on $\PType{\Gamma}{x}{\Unroll{\Fix{X}{\tau'}}{p'}}{\tau}$,
+    we have $\tau = \Subst{X}{\Fix{X}{\tau'}}{\tau'}$ and $\PType{\Gamma}{x}{p'}{\Fix{X}{\tau'}}$.
+
+    By induction with $\PType{\Gamma}{x}{p'}{\Fix{X}{\tau'}}$ and $\PEval{V}{H}{x}{p'}{\alpha}{r'}$,
+    we have $\ARType{\Sigma}{\Psi}{\alpha}{r'}{\Fix{X}{\tau'}}$.
+
+    By applying \textsc{RT-UNROLL} to $\ARType{\Sigma}{\Psi}{\alpha}{r'}{\Fix{X}{\tau'}}$,
+    we have
+    $\ARType{\Sigma}{\Psi}{\alpha}{\Unroll{\Fix{X}{\tau'}}{r'}}{\Subst{X}{\Fix{X}{\tau'}}{\tau'}}$.
 \end{proof}
 
 \begin{lem}[Shallow Type Preservation]
