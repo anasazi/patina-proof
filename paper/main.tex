@@ -42,12 +42,16 @@
 \newcommand{\Subst}[3]{[{#1} \mapsto {#2}]{#3}}
 
 \newcommand{\Type}[3]{{#1} \vdash {#2} : {#3}}
+\newcommand{\PType}[4]{\Type{{#1}}{{#2}\ {#3}}{{#4}}}
 \newcommand{\RTType}[4]{\Type{{#1} ;{#2}}{{#3}}{{#4}}}
 \newcommand{\ARType}[5]{\RTType{{#1}}{{#2}}{{#3}\ {#4}}{{#5}}}
 \newcommand{\Read}[4]{\textsc{read}({#1},{#2},{#3},{#4})}
 \newcommand{\HWF}[3]{\vdash {#1} : {#2} ; {#3}}
+\newcommand{\SWF}[3]{{#1}; {#2} \vdash {#3}}
 \newcommand{\YWF}[2]{\vdash {#1} : {#2}}
 \newcommand{\Shallow}[4]{\textsc{shallow}({#1},{#2},{#3},{#4})}
+\newcommand{\Eval}[3]{{#1} \vdash {#2} \rightarrow {#3}}
+\newcommand{\PEval}[6]{\Eval{{#1};{#2}}{{#3}\ {#4}}{{#5}\ {#6}}}
 
 \section{Syntax}
 
@@ -192,7 +196,10 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
        \forall \alpha \in \dom(\Sigma).\ \Sigma(\alpha)\ \textrm{closed} \\\\
        \forall (\alpha, r) \in \dom(\Psi).\ \Read{H}{\alpha}{r}{\VarVal{\Psi(\alpha, r)}{l}{n}}
       }
-      {\HWF{H}{\Sigma}{\Psi}}
+      {\HWF{H}{\Sigma}{\Psi}} \\
+    \infer
+      {\forall x \in \dom{\Gamma}.\ \Gamma(x) = \Sigma(V(x))}
+      {\SWF{\Gamma}{V}{\Sigma}}
   \end{mathpar}
   \caption{Heap Well-Formed}
 \end{figure}
@@ -432,5 +439,110 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
   \end{mathpar}
   \caption{Shallowly Initialized / Read Shape}
 \end{figure}
+
+\section{Paths}
+
+\begin{figure}[H]
+  \begin{mathpar}
+    \infer[PE-BASE]
+      {V(x) = \alpha}
+      {\PEval{V}{H}{x}{\Base}{\alpha}{\Base}}
+
+    \infer[PE-PROJ]
+      {\PEval{V}{H}{x}{p}{\alpha}{r}}
+      {\PEval{V}{H}{x}{\Proj{p}{n}{i}}{\alpha}{\Proj{r}{n}{i}}}
+
+    \infer[PE-DEOWN]
+      {\PEval{V}{H}{x}{p}{\alpha}{r} \\ 
+       \Read{H}{\alpha}{r}{\Slot{\OwnVal{\alpha'}{r'}}}}
+      {\PEval{V}{H}{x}{\Deref{p}}{\alpha'}{r'}}
+
+    \infer[PE-DEREF]
+      {\PEval{V}{H}{x}{p}{\alpha}{r} \\ 
+      \Read{H}{\alpha}{r}{\Slot{\Ref{q}{\alpha'}{r'}}}}
+      {\PEval{V}{H}{x}{\Deref{p}}{\alpha'}{r'}}
+
+    \infer[PE-UNROLL]
+      {\PEval{V}{H}{x}{p}{\alpha}{r}}
+      {\PEval{V}{H}{x}{\Unroll{\tau}{p}}{\alpha}{\Unroll{\tau}{r}}}
+  \end{mathpar}
+  \caption{Path Evalutation}
+\end{figure}
+
+\begin{figure}[H]
+  \begin{mathpar}
+    \infer[PT-BASE]
+      {\Gamma(x)=\tau}
+      {\PType{\Gamma}{x}{\Base}{\tau}}
+
+    \infer[PT-DEOWN]
+      {\PType{\Gamma}{x}{p}{\Own{\tau}}}
+      {\PType{\Gamma}{x}{\Deref{p}}{\tau}}
+
+    \infer[PT-DEREF]
+      {\PType{\Gamma}{x}{p}{\Ref{\ell}{q}{\tau}}}
+      {\PType{\Gamma}{x}{\Deref{p}}{\tau}}
+
+    \infer[PT-PROJ]
+      {\PType{\Gamma}{x}{p}{\Rec{\tau_i}{n}}}
+      {\PType{\Gamma}{x}{\Proj{p}{n}{i}}{\tau_i}}
+
+    \infer[PT-UNROLL]
+      {\tau=\Fix{X}{\tau'} \\ \PType{\Gamma}{x}{p}{\tau}}
+      {\PType{\Gamma}{x}{\Unroll{\tau}{p}}{\Subst{X}{\tau}{\tau'}}}
+  \end{mathpar}
+  \caption{Path Typing}
+\end{figure}
+
+\begin{lem}[Path Type Uniqueness]
+  $\PType{\Gamma}{x}{p}{\tau}\ \land\ \PType{\Gamma}{x}{p}{\tau'}\ \Rightarrow\ \tau = \tau'$.
+\end{lem}
+
+\begin{proof}
+  TODO. Probably just straightforward induction.
+\end{proof}
+
+\begin{lem}[Path Type Preservation]
+  $\HWF{H}{\Sigma}{\Psi}\ \land\ \SWF{\Gamma}{V}{\Sigma}\ \land\ \\
+   \PType{\Gamma}{x}{p}{\tau}\ \land\ \PEval{V}{H}{x}{p}{\alpha}{r}\ \Rightarrow\
+   \ARType{\Sigma}{\Psi}{\alpha}{r}{\tau}$.
+\end{lem}
+
+\begin{proof}
+  TODO transcribe from paper. 
+  Base, Proj, and Unroll cases immediate by inversion and induction.
+  Deown/ref cases use read safety and read uniqueness as well.
+\end{proof}
+
+\begin{lem}[Shallow Type Preservation]
+  $\YWF{\Upsilon}{\Gamma}\ \land\ \PType{\Gamma}{x}{p}{\tau}\ \land\
+   \Shallow{\Upsilon}{x}{p}{\sigma}\ \Rightarrow\ \Type{\Upsilon}{\sigma}{\tau}$.
+\end{lem}
+
+\begin{proof}
+  TODO.
+\end{proof}
+
+\begin{lem}[Path Shape Preservation]
+  $\Type{V}{H}{\Upsilon}\ \land\ \Shallow{\Upsilon}{x}{p}{\sigma}\ \land\
+   \PEval{V}{H}{x}{p}{\alpha}{r}\ \land\ \Read{H}{\alpha}{r}{l}\ \Rightarrow\
+   \Type{H}{l}{\sigma}$.
+\end{lem}
+
+\begin{proof}
+  TODO.
+\end{proof}
+
+\begin{lem}[Path Progress]
+  $\HWF{H}{\Sigma}{\Psi}\ \land\ \SWF{\Gamma}{V}{\Sigma}\ \land\
+   \YWF{\Upsilon}{\Gamma}\ \land\ \\ \Type{V}{H}{\Upsilon}\ \land\ 
+   \PType{\Gamma}{x}{p}{\tau}\ \land\ \Shallow{\Upsilon}{x}{p}{\sigma}\ 
+   \Rightarrow\ \exists \alpha, r.\ \PEval{V}{H}{x}{p}{\alpha}{r}$.
+\end{lem}
+
+\begin{proof}
+  TODO transcribe from paper. Base, Proj, and Unroll cases are trivial.
+  Deown/ref cases use a chain of preservation lemmas (path type, read safety, path shape).
+\end{proof}
 
 \end{document}
