@@ -766,7 +766,75 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
 \end{lem}
 
 \begin{proof}
-  TODO.
+  Induction on $\PEval{V}{H}{x}{p}{\alpha}{r}$.
+
+  \textsc{Case PE-BASE}:
+    Then $p = \Base$, $r = \Base$,  and $V(x) = \alpha$.
+
+    By inversion via \textsc{SI-BASE}, we have $\Upsilon(x) = \sigma$.
+
+    By inversion via \textsc{RD-BASE}, we have $H(\alpha) = l$.
+
+    By $\Type{V}{H}{\Upsilon}$, we have $\Type{H}{H(V(x))}{\Upsilon(x)}$,
+    which is just $\Type{H}{l}{\sigma}$ as required.
+
+  \textsc{Case PE-DEOWN}:
+    Then $p = \Deref{p'}$, $\PEval{V}{H}{x}{p'}{\alpha'}{r'}$, and
+    $\Read{H}{\alpha'}{r'}{\Slot{\OwnVal{\alpha}{r}}}$.
+
+    Inverting on $\Shallow{\Upsilon}{x}{\Deref{p'}}{\sigma}$ presents two cases:
+    \textsc{SI-DEOWN} and \textsc{SI-DEREF}. However, the \textsc{SI-DEREF} case is impossible.
+    Inversion in that case implies $\Shallow{\Upsilon}{x}{p'}{\Hole{\RefVal{q}{\tau}}}$.
+    By induction, we would have $\Type{H}{\Slot{\OwnVal{\alpha}{r}}}{\Hole{\RefVal{q}{\tau}}}$.
+    This is a contradiction because it is impossible to construct.
+    Ergo, the only case is \textsc{SI-DEOWN} and it implies
+    $\Shallow{\Upsilon}{x}{p'}{\Hole{\Own{\sigma}}}$.
+
+    By induction, we have $\Type{H}{\Slot{\OwnVal{\alpha}{r}}}{\Hole{\Own{\sigma}}}$.
+
+    By inversion via \textsc{LS-OWN}, we have $\Read{H}{\alpha}{r}{l'}$ and $\Type{H}{l'}{\sigma}$.
+
+    By Read Uniqueness, $l = l'$. Ergo, $\Type{H}{l}{\sigma}$ as required.
+
+  \textsc{Case PE-DEREF}:
+    Then $p = \Deref{p'}$, $\PEval{V}{H}{x}{p'}{\alpha'}{r'}$, and
+    $\Read{H}{\alpha'}{r'}{\Slot{\Ref{q}{\alpha}{r}}}$.
+
+    For similar reason as in the \textsc{PE-DEOWN} case the only applicable case for
+    $\Shallow{\Upsilon}{x}{\Deref{p'}}{\sigma}$ is \textsc{SI-DEREF}.
+    Thus we have $\Shallow{\Upsilon}{x}{p'}{\Hole{\RefVal{q}{\tau}}}$.
+
+    By induction, we have $\Type{H}{\Slot{\Ref{q}{\alpha}{r}}}{\Hole{\RefVal{q}{\tau}}}$.
+
+    By inversion via \textsc{LS-REF}, we have $\Read{H}{\alpha}{r}{l'}$.
+
+    By Read Uniqueness, $l = l'$. Ergo, $\Type{H}{l}{\sigma}$ as required.
+
+  \textsc{Case PE-PROJ}:
+    Then $p = \Proj{p'}{n}{i}$, $r = \Proj{r'}{n}{i}$, and $\PEval{V}{H}{x}{p'}{\alpha}{r'}$.
+
+    By inversion via \textsc{SI-PROJ}, we have $\sigma = \sigma_i$ and
+    $\Shallow{\Upsilon}{x}{p'}{\Rec{\sigma_i}{n}}$.
+
+    By inversion via \textsc{RD-PROJ}, we have $l = l_i$ and $\Read{H}{\alpha}{r'}{\Rec{l_i}{n}}$.
+
+    By induction we have $\Type{H}{\Rec{l_i}{n}}{\Rec{\sigma_i}{n}}$.
+
+    By inversion via \textsc{LS-REC}, we have $\Type{H}{l_i}{\sigma_i}$ as required.
+
+  \textsc{Case PE-UNROLL}:
+    Then $p = \Unroll{\tau}{p'}$, $r = \Unroll{\tau}{r'}$, and $\PEval{V}{H}{x}{p'}{\alpha}{r'}$.
+
+    By inversion via \textsc{SI-UNROLL},
+    we have $\Shallow{\Upsilon}{x}{p'}{\Roll{\tau}{\sigma}}$.
+
+    By inversion via \textsc{RD-UNROLL},
+    we have $\Read{H}{\alpha}{r'}{\Roll{\tau}{l}}$.
+
+    By induction, we have $\Type{H}{\Roll{\tau}{l}}{\Roll{\tau}{\sigma}}$.
+
+    By inversion via \textsc{LS-ROLL}, we have $\Type{H}{l}{\sigma}$.
+
 \end{proof}
 
 \begin{lem}[Path Progress]
