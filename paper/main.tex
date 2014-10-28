@@ -689,7 +689,74 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
 \end{lem}
 
 \begin{proof}
-  TODO.
+  Induction on $\Shallow{\Upsilon}{x}{p}{\sigma}$.
+
+  \textsc{Case SI-BASE}:
+    Then $p = \Base$ and $\Upsilon(x) = \sigma$.
+
+    By inversion via \textsc{PT-BASE} on $\PType{\Gamma}{x}{\Base}{\tau}$,
+    we have $\Gamma(x) = \tau$.
+
+    From $\YWF{\Upsilon}{\Gamma}$, we have $\Type{\Upsilon}{\Upsilon(x)}{\Gamma(x)}$.
+
+    Ergo, we have $\Type{\Upsilon}{\sigma}{\tau}$.
+
+  \textsc{Case SI-DEOWN}: 
+    Then $p = \Deref{p'}$ and $\Shallow{\Upsilon}{x}{p'}{\Hole{\Own{\sigma}}}$.
+
+    By inversion, $\PType{\Gamma}{x}{\Deref{p'}}{\tau}$ was constructed by either
+    \textsc{PT-DEOWN} or \textsc{PT-DEREF}. The \textsc{PT-DEREF} case will result
+    in a contradiction. It implies $\PType{\Gamma}{x}{p'}{\Ref{\ell}{q}{\tau}}$ by inversion.
+    Induction on this combined with $\Shallow{\Upsilon}{x}{p'}{\Hole{\Own{\sigma}}}$ implies
+    $\Type{\Upsilon}{\Hole{\Own{\sigma}}}{\Ref{\ell}{q}{\tau}}$, which is impossible to construct.
+    Ergo, \textsc{PT-DEOWN} is the only possible case.
+    It implies $\PType{\Gamma}{x}{p'}{\Own{\tau}}$ by inversion.
+
+    By induction, we have $\Type{\Upsilon}{\Hole{\Own{\sigma}}}{\Own{\tau}}$.
+
+    By inversion via \textsc{SH-HOLE}, we have $\Type{\Upsilon}{\Own{\sigma}}{\Own{\tau}}$.
+
+    By inversion via \textsc{HT-OWN}, we have $\Type{\Upsilon}{\sigma}{\tau}$.
+  
+  \textsc{Case SI-DEREF}:
+    Then $p = \Deref{p'}$ and $\Shallow{\Upsilon}{x}{p'}{\Hole{\RefVal{q}{\tau}}}$.
+
+    By reversing the roles of \textsc{PT-DEOWN} and \textsc{PT-DEREF} from the \textsc{SI-DEOWN}
+    case, it follows that \textsc{PT-DEREF} is the only applicable case.
+    Thus by inversion, we have $\PType{\Gamma}{x}{p'}{\Ref{\ell}{q}{\tau}}$.
+
+    By induction, we have $\Type{\Upsilon}{\Hole{\RefVal{q}{\tau}}}{\Ref{\ell}{q}{\tau}}$.
+
+    By inversion via \textsc{SH-HOLE}, we have
+    $\Type{\Upsilon}{\RefVal{q}{\tau}}{\Ref{\ell}{q}{\tau}}$.
+
+    By inversion via \textsc{HT-REF}, we have $\Type{\Upsilon}{\sigma}{\tau}$.
+
+  \textsc{Case SI-PROJ}:
+    Then $p = \Proj{p'}{n}{i}$, $\sigma = \sigma_i$,
+    and $\Shallow{\Upsilon}{x}{p'}{\Rec{\sigma_i}{n}}$.
+
+    By inversion via \textsc{PT-PROJ}, we have $\tau = \tau_i$ and 
+    $\PType{\Gamma}{x}{p'}{\Rec{\tau_i}{n}}$.
+
+    By induction, we have $\Type{\Upsilon}{\Rec{\sigma_i}{n}}{\Rec{\tau_i}{n}}$.
+
+    By inversion via \textsc{SH-REC}, we have $\Type{\Upsilon}{\sigma_i}{\tau_i}$.
+
+  \textsc{Case SI-UNROLL}:
+    Then $p = \Unroll{\tau'}{p'}$ and $\Shallow{\Upsilon}{x}{p'}{\Roll{\tau'}{\sigma}}$.
+
+    By inversion via \textsc{PT-UNROLL}, we have: 
+    $\tau' = \Fix{X}{\tau''}$,
+    $\tau = \Subst{X}{\tau'}{\tau''}$, and
+    $\PType{\Gamma}{x}{p'}{\tau'}$.
+
+    By induction, we have $\Type{\Upsilon}{\Roll{\tau'}{\sigma}}{\tau'}$.
+
+    By inversion via \textsc{SH-ROLL}, we have
+    $\Type{\Upsilon}{\sigma}{\Subst{X}{\tau'}{\tau''}}$, 
+    which is just $\Type{\Upsilon}{\sigma}{\tau}$.
+
 \end{proof}
 
 \begin{lem}[Path Shape Preservation]
