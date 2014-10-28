@@ -268,17 +268,12 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
     By induction, $\Roll{\tau'}{l} = \Roll{\tau''}{l'}$. Thus, $l = l'$.
 \end{proof}
 
-\pagebreak % TODO remove? temporary for avoiding orphan
-
 \begin{lem}[Read Safety]
   $\HWF{H}{\Sigma}{\Psi}\ \land\ \ARType{\Sigma}{\Psi}{\alpha}{r}{\tau}\ \Rightarrow\ 
   \exists l. \Read{H}{\alpha}{r}{l} \land \RTType{\Sigma}{\Psi}{l}{\tau}$.
 \end{lem}
 
 \begin{proof}
-  %TODO transcribe from paper.
-  %Mostly straightforward induction on $\ARType{\Sigma}{\Psi}{\alpha}{r}{\tau}$.
-  %Utilizes Read Uniqueness in the \textsc{RD-PAY} case.
   Induction on the derivation of $\ARType{\Sigma}{\Psi}{\alpha}{r}{\tau}$.
   
   \textsc{Case RT-BASE}:
@@ -426,7 +421,7 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
 
     \infer[LS-VAR]
       {TODO ?init(H,l)?}
-      {\Type{H}{\VarVal{i}{l}{n}}{\hole{\Var{\tau_i}{n}}}}
+      {\Type{H}{\VarVal{i}{l}{n}}{\Hole{\Var{\tau_i}{n}}}}
 
     \infer[LS-REC]
       {\forall i.\ \Type{H}{l_i}{\sigma_i}}
@@ -561,8 +556,6 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
   TODO. Probably just straightforward induction.
 \end{proof}
 
-\pagebreak % TODO remove?
-
 \begin{lem}[Path Type Preservation]
   $\HWF{H}{\Sigma}{\Psi}\ \land\ \SWF{\Gamma}{V}{\Sigma}\ \land\ \\
    \PType{\Gamma}{x}{p}{\tau}\ \land\ \PEval{V}{H}{x}{p}{\alpha}{r}\ \Rightarrow\
@@ -570,9 +563,6 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
 \end{lem}
 
 \begin{proof}
-%  TODO transcribe from paper. 
-%  Base, Proj, and Unroll cases immediate by inversion and induction.
-%  Deown/ref cases use read safety and read uniqueness as well.
   Induction on $\PEval{V}{H}{x}{p}{\alpha}{r}$.
 
   \textsc{Case PE-BASE}:
@@ -644,8 +634,114 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
 \end{lem}
 
 \begin{proof}
-  TODO transcribe from paper. Base, Proj, and Unroll cases are trivial.
-  Deown/ref cases use a chain of preservation lemmas (path type, read safety, path shape).
+  Induction on $\PType{\Gamma}{x}{p}{\tau}$.
+
+  \textsc{Case PT-BASE}: 
+    Then $p = \Base$ and $\Gamma(x) = \tau$.
+
+    From $\SWF{\Gamma}{V}{\Sigma}$, we have $\Gamma(x) = \Sigma(V(x))$.
+    Ergo, $\exists \alpha.\ V(x) = \alpha$.
+
+    By \textsc{PE-BASE}, we have $\PEval{V}{H}{x}{\Base}{\alpha}{\Base}$.
+
+  \textsc{Case PT-DEOWN}:
+    Then $p = \Deref{p'}$ and $\PType{\Gamma}{x}{p'}{\Own{\tau}}$.
+
+    By inversion, $\Shallow{\Upsilon}{x}{\Deref{p'}}{\sigma}$ was built by either
+    \textsc{SI-DEOWN} or \textsc{SI-DEREF}. However, the \textsc{SI-DEREF} case is
+    impossible as Shallow Type Preservation would imply
+    $\PType{\Gamma}{x}{p'}{\Ref{\ell}{q}{\tau}}$, which is a contradiction due to
+    $\PType{\Gamma}{x}{p'}{\Own{\tau}}$ and Path Type Uniqueness.
+    Thus the only case is \textsc{SI-DEOWN}, which implies
+    $\Shallow{\Upsilon}{x}{p'}{\Hole{\Own{\sigma}}}$.
+
+    By induction with $\PType{\Gamma}{x}{p'}{\Own{\tau}}$ and
+    $\Shallow{\Upsilon}{x}{p'}{\Hole{\Own{\sigma}}}$, we have
+    $\exists \alpha, r.\ \PEval{V}{H}{x}{p'}{\alpha}{r}$.
+
+    By Path Type Preservation with $\PType{\Gamma}{x}{p'}{\Own{\tau}}$ and
+    $\PEval{V}{H}{x}{p'}{\alpha}{r}$, we have $\ARType{\Sigma}{\Psi}{\alpha}{r}{\Own{\tau}}$.
+
+    By Read Safety with $\ARType{\Sigma}{\Psi}{\alpha}{r}{\Own{\tau}}$, we have
+    $\exists l.\ \Read{H}{\alpha}{r}{l}\ \land\ \RTType{\Sigma}{\Psi}{l}{\Own{\tau}}$.
+
+    By inversion via \textsc{LT-SLOT} on $\RTType{\Sigma}{\Psi}{l}{\Own{\tau}}$,
+    we have $l = \Slot{s}$ and $\RTType{\Sigma}{\Psi}{s}{\Own{\tau}}$.
+
+    By Path Shape Preservation with $\Shallow{\Upsilon}{x}{p'}{\Hole{\Own{\sigma}}}$,
+    $\PEval{V}{H}{x}{p'}{\alpha}{r}$, and $\Read{H}{\alpha}{r}{\Slot{s}}$, we have
+    $\Type{H}{\Slot{s}}{\Hole{\Own{\sigma}}}$.
+
+    By inversion via \textsc{LS-OWN}, we have: $s =\ \OwnVal{\alpha'}{r'}$ and
+    $\Read{H}{\alpha'}{r'}{l'}$.
+
+    By applying \textsc{PE-DEOWN} to $\PEval{V}{H}{x}{p'}{\alpha}{r}$ and
+    $\Read{H}{\alpha}{r}{\Slot{\OwnVal{\alpha'}{r'}}}$, we have
+    $\PEval{V}{H}{x}{\Deref{p'}}{\alpha'}{r'}$.
+
+  \textsc{Case PT-DEREF}:
+    Then $p = \Deref{p'}$ and $\PType{\Gamma}{x}{p'}{\Ref{\ell}{q}{\tau}}$.
+
+    By inversion, $\Shallow{\Upsilon}{x}{\Deref{p'}}{\sigma}$ was built by either
+    \textsc{SI-DEOWN} or \textsc{SI-DEREF}. However, the \textsc{SI-DEOWN} case is
+    impossible as Shallow Type Preservation would imply
+    $\PType{\Gamma}{x}{p'}{\Own{\tau}}$, which is a contradiction due to
+    $\PType{\Gamma}{x}{p'}{\Ref{\ell}{q}{\tau}}$ and Path Type Uniqueness.
+    Thus the only case is \textsc{SI-DEREF}, which implies
+    $\Shallow{\Upsilon}{x}{p'}{\Hole{\RefVal{q}{\tau}}}$.
+
+    By induction with $\PType{\Gamma}{x}{p'}{\Ref{\ell}{q}{\tau}}$ and
+    $\Shallow{\Upsilon}{x}{p'}{\Hole{\RefVal{q}{\tau}}}$, we have
+    $\exists \alpha, r.\ \PEval{V}{H}{x}{p'}{\alpha}{r}$.
+
+    By Path Type Preservation with $\PType{\Gamma}{x}{p'}{\Ref{\ell}{q}{\tau}}$ and
+    $\PEval{V}{H}{x}{p'}{\alpha}{r}$, we have
+    $\ARType{\Sigma}{\Psi}{\alpha}{r}{\Ref{\ell}{q}{\tau}}$.
+
+    By Read Safety with $\ARType{\Sigma}{\Psi}{\alpha}{r}{\Ref{\ell}{q}{\tau}}$, we have
+    $\exists l.\ \Read{H}{\alpha}{r}{l}\ \land\ \RTType{\Sigma}{\Psi}{l}{\Ref{\ell}{q}{\tau}}$.
+
+    By inversion via \textsc{LT-SLOT} on $\RTType{\Sigma}{\Psi}{l}{\Ref{\ell}{q}{\tau}}$,
+    we have $l = \Slot{s}$ and $\RTType{\Sigma}{\Psi}{s}{\Ref{\ell}{q}{\tau}}$.
+
+    By Path Shape Preservation with $\Shallow{\Upsilon}{x}{p'}{\Hole{\RefVal{q}{\tau}}}$,
+    $\PEval{V}{H}{x}{p'}{\alpha}{r}$, and $\Read{H}{\alpha}{r}{\Slot{s}}$, we have
+    $\Type{H}{\Slot{s}}{\Hole{\RefVal{q}{\tau}}}$.
+
+    By inversion via \textsc{LS-REF}, we have: $s = \Ref{q}{\alpha'}{r'}$ and
+    $\Read{H}{\alpha'}{r'}{l'}$.
+
+    By applying \textsc{PE-DEREF} to $\PEval{V}{H}{x}{p'}{\alpha}{r}$ and
+    $\Read{H}{\alpha}{r}{\Slot{\Ref{q}{\alpha'}{r'}}}$, we have
+    $\PEval{V}{H}{x}{\Deref{p'}}{\alpha'}{r'}$.
+
+  \textsc{Case PT-PROJ}:
+    Then $p = \Proj{p'}{n}{i}$, $\tau = \tau_i$, and $\PType{\Gamma}{x}{p'}{\Rec{\tau_i}{n}}$.
+
+    By inversion via \textsc{SI-PROJ} on $\Shallow{\Upsilon}{x}{\Proj{p'}{n}{i}}{\sigma}$,
+    we have $\sigma = \sigma_i$ and $\Shallow{\Upsilon}{x}{p'}{\Rec{\sigma_i}{n}}$.
+
+    By induction with $\PType{\Gamma}{x}{p'}{\Rec{\tau_i}{n}}$
+    and $\Shallow{\Upsilon}{x}{p'}{\Rec{\sigma_i}{n}}$,
+    we have $\exists \alpha, r.\ \PEval{V}{H}{x}{p'}{\alpha}{r}$.
+
+    By applying \textsc{PE-PROJ} to $\PEval{V}{H}{x}{p'}{\alpha}{r}$,
+    we have $\PEval{V}{H}{x}{\Proj{p'}{n}{i}}{\alpha}{\Proj{r}{n}{i}}$.
+
+  \textsc{Case PT-UNROLL}:
+    Then $p = \Unroll{\Fix{X}{\tau'}}{p'}$, $\tau = \Subst{X}{\Fix{X}{\tau'}}{\tau'}$,
+    and $\PType{\Gamma}{x}{p'}{\Fix{X}{\tau'}}$.
+
+    By inversion via \textsc{SI-UNROLL} on
+    $\Shallow{\Upsilon}{x}{\Unroll{\Fix{X}{\tau'}}{p'}}{\sigma}$, we have
+    $\Shallow{\Upsilon}{x}{p'}{\Roll{\Fix{X}{\tau'}}{\sigma}}$.
+
+    By induction with $\PType{\Gamma}{x}{p'}{\Fix{X}{\tau'}}$
+    and $\Shallow{\Upsilon}{x}{p'}{\Roll{\Fix{X}{\tau'}}{\sigma}}$,
+    we have $\exists \alpha, r.\ \PEval{V}{H}{x}{p'}{\alpha}{r}$.
+
+    By applying \textsc{PE-UNROLL} to $\PEval{V}{H}{x}{p'}{\alpha}{r}$,
+    we have $\PEval{V}{H}{x}{\Unroll{\Fix{X}{\tau'}}{p'}}{\alpha}{\Unroll{\Fix{X}{\tau'}}{r}}$.
 \end{proof}
 
 \end{document}
