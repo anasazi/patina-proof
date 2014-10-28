@@ -553,7 +553,50 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
 \end{lem}
 
 \begin{proof}
-  TODO. Probably just straightforward induction.
+  Induction on $\PType{\Gamma}{x}{p}{\tau}$.
+
+  \textsc{Case PT-BASE}:
+    Then $p = \Base$ and $\Gamma(x) = \tau$.
+
+    By inversion via \textsc{PT-BASE} on $\PType{\Gamma}{x}{\Base}{\tau'}$,
+    we have $\Gamma(x) = \tau'$.
+    
+    Ergo, $\tau = \Gamma(x) = \tau'$.
+
+  \textsc{Case PT-DEOWN}:
+    Then $p = \Deref{p'}$ and $\PType{\Gamma}{x}{p'}{\Own{\tau}}$.
+
+    By inversion, $\PType{\Gamma}{x}{\Deref{p'}}{\tau'}$ was built by either \textsc{PT-DEOWN}
+    or by \textsc{PT-DEREF}.
+
+    In the \textsc{PT-DEOWN} case, we have $\PType{\Gamma}{x}{p'}{\Own{\tau'}}$.
+
+    By induction, we have $\Own{\tau} =\ \Own{\tau'}$, which implies $\tau = \tau'$.
+
+    In the \textsc{PT-DEREF} case, we have $\PType{\Gamma}{x}{p'}{\Ref{\ell}{q}{\tau'}}$.
+
+    But induction implies $\Own{\tau} = \Ref{\ell}{q}{\tau'}$, which is a contradiction
+    so this case is impossible.
+
+  \textsc{Case PT-DEREF}:
+    Similar to the \textsc{PT-DEOWN} case except the roles of \textsc{PT-DEOWN}
+    and \textsc{PT-DEREF} are swapped.
+
+  \textsc{Case PT-PROJ}:
+    Then $p = \Proj{p'}{n}{i}$, $\tau = \tau_i$, and $\PType{\Gamma}{x}{p'}{\Rec{\tau_i}{n}}$.
+
+    By inversion via \textsc{PT-PROJ} on $\PType{\Gamma}{x}{\Proj{p'}{n}{i}}{\tau'}$,
+    we have $\tau' = \tau'_i$ and $\PType{\Gamma}{x}{p'}{\Rec{\tau'_i}{n}}$.
+    By induction, we have $\Rec{\tau_i}{n} = \Rec{\tau'_i}{n}$, so $\tau_i = \tau'_i$.
+
+  \textsc{Case PT-UNROLL}:
+    Then $p = \Unroll{\Fix{X}{\tau_0}}{p'}$, $\tau = \Subst{X}{\Fix{X}{\tau_0}}{\tau_0}$,
+    and $\PType{\Gamma}{x}{p'}{\Fix{X}{\tau_0}}$.
+
+    By inversion via \textsc{PT-UNROLL} on
+    $\PType{\Gamma}{x}{\Unroll{\Fix{X}{\tau_0}}{p'}}{\tau'}$, we have
+    $\tau' = \Subst{X}{\Fix{X}{\tau_0}}{\tau_0} = \tau$.
+
 \end{proof}
 
 \begin{lem}[Path Type Preservation]
