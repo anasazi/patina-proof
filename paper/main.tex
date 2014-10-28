@@ -575,9 +575,42 @@ TODO describe Lifetime in more detail (values vs variables, the relation etc).
 
     By applying \textsc{RT-BASE}, we have $\ARType{\Sigma}{\Psi}{\alpha}{\Base}{\tau}$.
 
-  \textsc{Case PE-DEOWN}: TODO
+  \textsc{Case PE-DEOWN}:
+    Then $p = \Deref{p'}$, $\PEval{V}{H}{x}{p'}{\alpha'}{r'}$,
+    and $\Read{H}{\alpha'}{r'}{\Slot{\OwnVal{\alpha}{r}}}$.
 
-  \textsc{Case PE-DEREF}: TODO
+    By inversion, there are two ways $\PType{\Gamma}{x}{\Deref{p'}}{\tau}$ could have been built:
+    \textsc{PT-DEOWN} or \textsc{PT-DEREF}. The \textsc{PT-DEREF} case will turn out to be
+    impossible because it implies
+    $\RTType{\Sigma}{\Psi}{\Slot{\OwnVal{\alpha}{r}}}{\Ref{\ell}{q}{\tau}}$, which cannot be
+    derived. The proof for the \textsc{PT-DEOWN} case follows. The \textsc{PT-DEREF} case would
+    be handled similarly upto the contradiction, which I will point out.
+    Inversion via \textsc{PT-DEOWN} implies $\PType{\Gamma}{x}{p'}{\Own{\tau}}$.
+
+    By induction with $\PType{\Gamma}{x}{p'}{\Own{\tau}}$ and $\PEval{V}{H}{x}{p'}{\alpha'}{r'}$,
+    we have $\ARType{\Sigma}{\Psi}{\alpha'}{r'}{\Own{\tau}}$.
+
+    By Read Safety with $\ARType{\Sigma}{\Psi}{\alpha'}{r'}{\Own{\tau}}$, we have
+    $\exists l.\ \Read{H}{\alpha'}{r'}{l}\ \land\ \RTType{\Sigma}{\Psi}{l}{\Own{\tau}}$.
+
+    By Read Uniqueness with $\Read{H}{\alpha'}{r'}{\Slot{\OwnVal{\alpha}{r}}}$ and
+    $\Read{H}{\alpha'}{r'}{l}$, we have $l = \Slot{\OwnVal{\alpha}{r}}$.
+
+    (At this point in the \textsc{PT-DEREF} case we have 
+    $\RTType{\Sigma}{\Psi}{\Slot{\OwnVal{\alpha}{r}}}{\Ref{\ell}{q}{\tau}}$
+    and the contradiction appears.)
+
+    By inversion via \textsc{LT-SLOT} on
+    $\RTType{\Sigma}{\Psi}{\Slot{\OwnVal{\alpha}{r}}}{\Own{\tau}}$, we have
+    $\RTType{\Sigma}{\Psi}{\OwnVal{\alpha}{r}}{\Own{\tau}}$.
+
+    By inversion via \textsc{ST-OWN} on
+    $\RTType{\Sigma}{\Psi}{\OwnVal{\alpha}{r}}{\Own{\tau}}$, we have
+    $\ARType{\Sigma}{\Psi}{\alpha}{r}{\tau}$.
+
+    \textsc{Case PE-DEREF}: 
+      This is similar to the \textsc{PE-DEOWN} case except the roles of
+      \textsc{PT-DEOWN} and \textsc{PT-DEREF} are reversed.
 
   \textsc{Case PE-PROJ}:
     Then $p = \Proj{p'}{n}{i}$, $r = \Proj{r'}{n}{i}$, and $\PEval{V}{H}{x}{p'}{\alpha}{r'}$.
