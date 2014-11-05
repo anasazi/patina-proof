@@ -1,0 +1,302 @@
+\section*{Types}
+
+Values in Patina can be described by the following types:
+\[
+\begin{array}{lccl}
+\textrm{Lifetime} & \lt & & \\
+\textrm{Type Variable} & X & & \\
+\textrm{Qualifier} & q & \bnfdef & \qimm \bnfalt \qmut \\
+\textrm{Type} & \gt & \bnfdef & \tyint \bnfalt \own{\gt} \bnfalt \tyref{\lt}{q}{\gt} \bnfalt 
+				\subvar{\gt}{i}{n} \bnfalt \subrec{\gt}{i}{n} \bnfalt 
+				\tyfix{X}{\gt} \bnfalt X \\
+\end{array}
+\]
+
+$\own{\gt}$ is a unique pointer to a $\gt$.
+$\tyref{\lt}{q}{\gt}$ is a borrowed reference to a $\gt$
+providing mutability guarantee $q$ for lifetime $\lt$.
+$\subvar{\gt}{i}{n}$ is a variant type.
+$\subrec{\gt}{i}{n}$ is a tuple type.
+Finally, $\tyfix{X}{\gt}$ is a recursive type.
+
+\section*{L-values}
+
+L-values in Patina are a combination of a variable and a path.
+Paths are relative and specify subections of memory reachable from a L-value.
+
+\[
+\begin{array}{lccl}
+\textrm{Variable} & x & & \\
+\textrm{Path} & p & \bnfdef & \base \bnfalt \deref{p} \bnfalt \proj{p}{i} \bnfalt \unroll{\gt}{p} \\
+\end{array}
+\]
+
+Projection ($\proj{p}{i}$) deconstructs tuples.
+Unrolling ($\unroll{\gt}{p}$) deconstructs recursive types.
+Dereference ($\deref{p}$) deconstructs pointers and references.
+The base path ($\base$) does not deconstruct anything.
+
+The typing judgment for paths does not present any surprises.
+We use a partial map for the typing context and
+the type substitution operation is the standard capture-avoiding substition.
+
+$$ \gG : \mathrm{Variable} \to \mathrm{Type} $$
+
+\fbox{$\tc{\gG}{\lv{x}{p}}{\gt}$}
+
+\begin{mathpar}
+\infer[PT-BASE]{\gG(x)=\gt}{\tc{\gG}{\lv{x}{\base}}{\gt}} \and
+\infer[PT-DEOWN]{\tc{\gG}{\lv{x}{p}}{\own{\gt}}}{\tc{\gG}{\lv{x}{\deref{p}}}{\gt}} \and
+\infer[PT-DEREF]{\tc{\gG}{\lv{x}{p}}{\tyref{\lt}{q}{\gt}}}{\tc{\gG}{\lv{x}{\deref{p}}}{\gt}} \and
+\infer[PT-PROJ]{\tc{\gG}{\lv{x}{p}}{\subrec{\gt}{i}{n}}}{\tc{\gG}{\lv{x}{\proj{p}{i}}}{\gt_i}} \and
+\infer[PT-UNROLL]
+{\tc{\gG}{\lv{x}{p}}{\tyfix{X}{\gt}}}
+{\tc{\gG}{\lv{x}{\unroll{\tyfix{X}{\gt}}{p}}}{\sub{X}{\tyfix{X}{\gt}}{\gt}}}
+\end{mathpar}
+
+Unsurprisingly, path typing is unique.
+\begin{lem}[Path Type Uniqueness]
+  If $\tc{\gG}{\lv{x}{p}}{\gt}$ and $\tc{\gG}{\lv{x}{p}}{\gt'}$ then $\gt = \gt' $.
+\end{lem}
+
+\begin{proof}[Path Type Uniqueness]
+  We will use induction on the derivation of $\tc{\gG}{\lv{x}{p}}{\gt}$.
+  \begin{itemize}
+    \item[\textsc{PT-BASE}] Then $p = \base$.
+
+      By inversion, $\gG(x)=\gt$.
+      
+      There is only one possible rule (\textsc{PT-BASE}) for 
+      deriving $\tc{\gG}{\lv{x}{\base}}{\gt'}$ 
+      
+      Ergo, by inversion, $\gG(x)=\gt'$.
+
+      Thus, $\gt = \gt'$.
+    \item[\textsc{PT-DEOWN}] Then $p = \deref{p'}$.
+
+      By inversion, $\tc{\gG}{\lv{x}{p'}}{\own{\gt}}$.
+
+      There are two possible rules for deriving $\tc{\gG}{\lv{x}{\deref{p'}}}{\gt'}$.
+      \begin{itemize}
+	\item[\textsc{PT-DEOWN}]
+	  By inversion, $\tc{\gG}{\lv{x}{p'}}{\own{\gt'}}$.
+
+	  By induction $\own{\gt} =\ \own{\gt'}$.
+
+	  Ergo $\gt = \gt'$.
+	\item[\textsc{PT-DEREF}]
+	  By inversion, $\tc{\gG}{\lv{x}{p'}}{\tyref{\lt}{q}{\gt'}}$.
+
+	  By induction $\own{\gt} = \tyref{\lt}{q}{\gt'}$, a contradiction.
+
+	  Thus, this case is impossible.
+      \end{itemize}
+    \item[\textsc{PT-DEREF}] Then $p = \deref{p'}$.
+
+      Similar to the \textsc{PT-DEOWN} case, 
+      but swapping the roles of \textsc{PT-DEOWN} and \textsc{PT-DEREF}.
+    \item[\textsc{PT-PROJ}] Then $p = \proj{p'}{i}$ and $\gt = \gt_i$.
+
+      By inversion, $\tc{\gG}{\lv{x}{p'}}{\subrec{\gt}{i}{n}}$.
+
+      There is only one rule (\textsc{PT-PROJ}) for deriving $\tc{\gG}{\lv{x}{\proj{p'}{i}}}{\gt'}$.
+
+      Thus, by inversion, $\gt' = \gt'_i$ and $\tc{\gG}{\lv{x}{p'}}{\subrec{\gt'}{i}{n'}}$.
+
+      By induction, $\subrec{\gt}{i}{n} = \subrec{\gt'}{i}{n'}$.
+
+      Ergo $n = n'$ and $\gt_i = \gt'_i$.
+    \item[\textsc{PT-UNROLL}] 
+      Then $p = \unroll{\tyfix{X}{\gt_0}}{p'}$ and $\gt = \sub{X}{\tyfix{X}{\gt_0}}{\gt_0}$.
+
+      There is only one rule (\textsc{PT-UNROLL}) for deriving
+      $\tc{\gG}{\lv{x}{\unroll{\tyfix{X}{\gt_0}}{p'}}}{\gt'}$.
+
+      Thus, by inversion, $\gt' = \sub{X}{\tyfix{X}{\gt_0}}{\gt_0}$.
+
+      Ergo $\gt = \sub{X}{\tyfix{X}{\gt_0}}{\gt_0} = \gt'$.
+  \end{itemize}
+\end{proof}
+
+\section*{Runtime Memory}
+
+\subsection*{Representation and Addressing}
+
+To accurately model Rust's memory usage, Patina restricts
+the contents of a memory cell to void data, an integer, or a pointer to another cell.
+Tuples and recursive types have no physical memory presence (beyond contiguity for tuples).
+The memory representation of a variant is a pair of a cell for the discriminant
+and whatever memory is necessary to store the payload.
+
+We could model this by a map from addresses to memory cell values,
+but two issues make this inconvenient: the need for address arithmetic
+and non-unique typing. However, we can add a little extra structure to
+our model and eliminate these two issues. We wrap the cells inside
+layouts describing the type structure overlaying memory.
+
+We also separate plain pointer cells into owned cells and reference cells.
+This is mostly useful for providing just enough type information about the pointer
+for memory operation purposes. We will explain how we address memory in a moment,
+so we use a placeholder for now.
+
+\[
+\begin{array}{lccl}
+\textrm{Integer} & z & & \\
+\textrm{Address} & \rho & & \textrm{a placeholder} \\
+\textrm{Cell} & c & \bnfdef & \void \bnfalt z \bnfalt \own{\rho} \bnfalt \Ref{q~\rho} \\
+\textrm{Layout} & l & \bnfdef & c \bnfalt \varval{c}{l} \bnfalt 
+			       \subrec{l}{i}{n} \bnfalt \roll{\gt}{l} \\
+\end{array}
+\]
+
+Due to the extra structure from layouts, addressing memory now requires
+more than simple labels. Instead we use a runtime analogue of variables and paths.
+Allocations are chunks of memory allocated and freed atomically.
+They correspond to either variables or heap allocations.
+Routes provide relative specification into layouts similar to paths with two key differences.
+
+\[
+\begin{array}{lccl}
+\textrm{Allocation} & \ga & & \\
+\textrm{Route} & r & \bnfdef & \base \bnfalt \proj{r}{i} \bnfalt \pay{r} \bnfalt \unroll{\gt}{r} \\
+\end{array}
+\]
+
+The $\base$ route, projection, and unrolling are effectively identical to their path equivalents.
+The $\pay{r}$ route refers to the payload $l$ in a variant $\varval{c}{l}$.
+This is primarily used for match-by-reference.
+Unlike paths, there is no dereference route.
+This forces any pointer following into path evaluation (into routes)
+rather than doing so while reading memory at a route.
+The address placeholder from before is simply a pair of an allocation label and a route.
+That is:
+
+\[
+\begin{array}{lccl}
+\textrm{Integer} & z & & \\
+\textrm{Allocation} & \ga & & \\
+\textrm{Route} & r & \bnfdef & \base \bnfalt \proj{r}{i} \bnfalt \pay{r} \bnfalt \unroll{\gt}{r} \\
+\textrm{Cell} & c & \bnfdef & \void \bnfalt z \bnfalt 
+			      \own{\addr{\ga}{r}} \bnfalt \refval{q}{\addr{\ga}{r}} \\
+\textrm{Layout} & l & \bnfdef & c \bnfalt \varval{c}{l} \bnfalt 
+			       \subrec{l}{i}{n} \bnfalt \roll{\gt}{l} \\
+\end{array}
+\]
+
+\subsection*{Reading}
+
+Reading a layout from a route in memory is a straightforward operation.
+We model the heap as a partial map from allocations to layouts.
+Routes and layouts interact as you would expect.
+
+$$ H : \mathrm{Allocation} \to \mathrm{Layout} $$
+
+\fbox{$\Read{H}{\addr{\ga}{r}}{l}$}
+
+\begin{mathpar}
+\infer[RD-BASE]{H(\ga)=l}{\Read{H}{\addr{\ga}{\base}}{l}} \and
+\infer[RD-PROJ]
+  {\Read{H}{\addr{\ga}{r}}{\subrec{l}{i}{n}}}
+  {\Read{H}{\addr{\ga}{\proj{r}{i}}}{l_i}} \and
+\infer[RD-PAY]{\Read{H}{\addr{\ga}{r}}{\varval{c}{l}}}{\Read{H}{\addr{\ga}{\pay{r}}}{l}} \and
+\infer[RD-UNROLL]{\Read{H}{\addr{\ga}{r}}{\roll{\gt'}{l}}}{\Read{H}{\addr{\ga}{\unroll{\gt}{r}}}{l}}
+\end{mathpar}
+
+As one would expect of a read operation, it's result is unique.
+
+\begin{lem}[Read Uniqueness]
+  If $\Read{H}{\addr{\ga}{r}}{l}$ and $\Read{H}{\addr{\ga}{r}}{l'}$, then $l = l'$.
+\end{lem}
+
+\begin{proof}[Read Uniqueness]
+  We will induct on the derivation of $\Read{H}{\addr{\ga}{r}}{l}$.
+  \begin{itemize}
+    \item[\textsc{RD-BASE}] Then $r = \base$.
+
+      By inversion, $H(\ga)=l$.
+
+      There is only one rule (\textsc{RD-BASE}) for deriving $\Read{H}{\addr{\ga}{\base}}{l'}$.
+
+      Thus, by inversion, $H(\ga)=l'$.
+
+      Ergo, $l = l'$.
+    \item[\textsc{RD-PROJ}] Then $r = \proj{r'}{i}$ and $l = l_i$.
+
+      By inversion, $\Read{H}{\addr{\ga}{r'}}{\subrec{l}{i}{n}}$.
+
+      There is only one rule (\textsc{RD-PROJ}) for
+      deriving $\Read{H}{\addr{\ga}{\proj{r'}{i}}}{l'}$.
+
+      Thus, by inversion, $\Read{H}{\addr{\ga}{r'}}{\subrec{l'}{i}{n'}}$.
+
+      By induction, $\subrec{l}{i}{n} = \subrec{l'}{i}{n'}$.
+
+      Ergo, $n = n'$ and $l_i = l'_i$.
+    \item[\textsc{RD-PAY}] Then $r = \pay{r'}$.
+
+      By inversion, $\Read{H}{\addr{\ga}{r'}}{\varval{c}{l}}$.
+
+      There is only one rule (\textsc{RD-PAY}) for deriving $\Read{H}{\addr{\ga}{\pay{r'}}}{l'}$.
+
+      Thus, by inversion, $\Read{H}{\addr{\ga}{r'}}{\varval{c'}{l'}}$.
+
+      By induction, $\varval{c}{l} = \varval{c'}{l'}$.
+
+      Ergo, $c = c'$ and $l = l'$.
+    \item[\textsc{RD-UNROLL}] Then $r = \unroll{\gt}{r'}$.
+
+      By inversion, $\Read{H}{\addr{\ga}{r'}}{\roll{\gt'}{l}}$.
+
+      There is only one rule (\textsc{RD-UNROLL}) for
+      deriving $\Read{H}{\addr{\ga}{\unroll{\gt}{r'}}}{l'}$.
+
+      Thus, by inversion, $\Read{H}{\addr{\ga}{r'}}{\roll{\gt''}{l'}}$.
+
+      By induction, $\roll{\gt'}{l} = \roll{\gt''}{l'}$.
+
+      Ergo, $\gt' = \gt''$ and $l = l'$.
+  \end{itemize}
+\end{proof}
+
+\section*{Path Evaluation}
+
+Now that we can read memory, we can define path evaluation.
+The only actual work of path evaluation is following the dereferences of pointers
+to produce a route. In order to connect variables to runtime allocations, we use
+a partial map tracking the allocation labels of variables.
+
+$$ V : \mathrm{Variable} \to \mathrm{Allocation} $$
+
+\fbox{$\ev{V;H}{\lv{x}{p}}{\addr{\ga}{r}}$}
+
+\begin{mathpar}
+\infer[PE-BASE]{V(x)=\ga}{\ev{V;H}{\lv{x}{\base}}{\addr{\ga}{\base}}} \and
+\infer[PE-DEOWN]
+  {\ev{V;H}{\lv{x}{p}}{\addr{\ga}{r}} \\ \Read{H}{\addr{\ga}{r}}{\own{\addr{\ga'}{r'}}}}
+  {\ev{V;H}{\lv{x}{\deref{p}}}{\addr{\ga'}{r'}}} \and
+\infer[PE-DEREF]
+  {\ev{V;H}{\lv{x}{p}}{\addr{\ga}{r}} \\ \Read{H}{\addr{\ga}{r}}{\refval{q}{\addr{\ga'}{r'}}}}
+  {\ev{V;H}{\lv{x}{\deref{p}}}{\addr{\ga'}{r'}}} \and
+\infer[PE-PROJ]
+  {\ev{V;H}{\lv{x}{p}}{\addr{\ga}{r}}}
+  {\ev{V;H}{\lv{x}{\proj{p}{i}}}{\addr{\ga}{\proj{r}{i}}}} \and
+\infer[PE-UNROLL]
+  {\ev{V;H}{\lv{x}{p}}{\addr{\ga}{r}}}
+  {\ev{V;H}{\lv{x}{\unroll{\gt}{p}}}{\addr{\ga}{\unroll{\gt}{r}}}}
+\end{mathpar}
+
+With path typing and evaluation now defined, we would like to prove progress
+and preservation for them. Preservation will require we define typing for
+runtime data (routes, cells, and layouts), which involves a slight bit of trickery
+around variant discriminants and the payload route.
+
+Progress will require a way to guarantee that the necessary \textsc{read}s 
+can be completed, i.e. any pointers we need to dereference are in fact initialized
+(a property we call \emph{shallow initialization}).
+We will accomplish this by using a kind of shadow heap, which will simply track
+initialization rather than values.
+This will require an analogue of \textsc{read} that extracts the initialization
+data for a path, a proof that this operation preserves types 
+(which itselfs requires typing for this shadow heap),
+a coherence check to ensure the shadow heap models the runtime heap,
+and a proof that a shallowly initialized path evaluates to a readable route.
