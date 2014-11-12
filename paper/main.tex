@@ -31,8 +31,10 @@
 % Greek shorthands
 \newcommand \ga {\alpha}
 \newcommand \gG {\Gamma}
+\newcommand \gs {\sigma}
 \newcommand \gS {\Sigma}
 \newcommand \gt {\tau}
+\newcommand \gU {\Upsilon}
 \newcommand \gY {\Psi}
 
 % qual shorthand
@@ -59,11 +61,16 @@
 \newcommand \varval[2] {\var{{#1}:{#2}}}
 \newcommand \roll[2] {\mathsf{roll}~[{#1}]~{#2}}
 
+% hole shorthand
+\newcommand \uninit {\mathsf{uninit}}
+
 % judgment shorthand
 \newcommand \tc[3] {{#1} \vdash {#2} : {#3}}
 \newcommand \sub[3] {[{#1} \mapsto {#2}] {#3}}
 \newcommand \Read[3] {\textsc{read}({#1},{#2},{#3})}
 \newcommand \ev[3] {{#1} \vdash {#2} \to {#3}}
+\newcommand \shallow[3] {\textsc{shallow}({#1},{#2},{#3})}
+\newcommand \initShadow[1] {\textsc{init}({#1})}
 
 \input{./intro.tex}
 \input{./paths.tex}

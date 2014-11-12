@@ -556,3 +556,263 @@ Under well-formed heap and contexts, typed paths evaluate to routes of the same 
       $\tc{\gS;\gY}{\addr{\ga}{\unroll{\tyfix{X}{\gt''}}{r'}}}{\sub{X}{\tyfix{X}{\gt''}}{\gt''}}$.
   \end{itemize}
 \end{proof}
+
+\section*{Tracking Initialization}
+To properly type check Patina, we need to know which paths point to initialized memory
+and which do not. This is important for ensuring we never use uninitialized memory and
+that we correctly free heap memory.
+We will accomplish this by creating a shadow heap.
+Instead of tracking actual values, we will simply track whether a cell is initialized.
+Paths will serve the same function for this shadow heap as routes do for the real heap.
+
+\[
+\begin{array}{lccl}
+\textrm{Hole} & h & \bnfdef & \uninit \bnfalt \tyint \bnfalt \own{\gs} 
+				      \bnfalt \refval{q}{\gt} \bnfalt \subvar{\gt}{i}{n} \\
+\textrm{Shadow} & \gs & \bnfdef & h \bnfalt \subrec{\gs}{i}{n} \bnfalt \roll{\gt}{\gs} \\
+\end{array}
+\]
+
+Since shadows and holes are supposed to be a shadow of the heap,
+it is unsurprising that they are very similar to layouts and cells.
+However, there are a few key differences.
+First, variants are considered an atomic value (and thus a hole) rather than
+a structure. This is because the discrimiant and payload of a variant always
+share the same initialization state.
+Second, while the pointer cells contain routes, the pointer holes do not
+contain paths (the analogue of routes).
+For references, there is no need because references always point to fully initialized things.
+Therefore, the reference hole simply records the type of the reference.
+For unique pointers, there is no path that could possibly be used
+(otherwise the pointer would not be unique).
+Therefore, the unique pointer hole records the shadow of the pointed-to heap memory.
+
+\section*{Checking Shallow Initialization}
+We will need an analogue of \textsc{read} for our shadow heap for the
+simple purpose of extracting the shadow at a path in the same way we
+need to extract the layout at a route from the heap.
+However, this analogue also serves as a very useful property checker:
+any dereferences in the path are dereferences of initialized memory.
+This property, called \emph{shallow initialization} is exactly what we need
+for path progress. A shallowly initialized path can successfully dereference
+all the pointers necessary to evaluate to a route.
+For this reason, we call this operation \textsc{shallow}.
+
+To support dereferencing references, we need to construct a shape from the referenced type.
+We do this with the \textsc{init} function.
+
+$$ $$
+
+\fbox{$\textsc{init} : \textrm{Type} \to \textrm{Shadow}$}
+
+\[
+\begin{array}{lcl}
+\initShadow{\tyint} &=& \tyint \\
+\initShadow{\own{\gt}} &=& \own{\initShadow{\gt}} \\
+\initShadow{\tyref{\lt}{q}{\gt}} &=& \refval{q}{\gt} \\
+\initShadow{\subrec{\gt}{i}{n}} &=& [\initShadow{\gt_i}]_{i \in \{1\ldots n\}} \\
+\initShadow{\subvar{\gt}{i}{n}} &=& \subvar{\gt}{i}{n} \\
+\initShadow{\tyfix{X}{\gt}} &=& \roll{\tyfix{X}{\gt}}{\initShadow{\sub{X}{\tyfix{X}{\gt}}{\gt}}} \\
+\end{array}
+\]
+
+We also need a new context recording the shadows of stack variables.
+
+$$ \gU : \textrm{Variable} \to \textrm{Shadow} $$
+
+\fbox{$\shallow{\gU}{\lv{x}{p}}{\gs}$}
+
+\begin{mathpar}
+\infer[SI-BASE]
+{\gU(x)=\gs}
+{\shallow{\gU}{\lv{x}{\base}}{\gs}}
+\and
+\infer[SI-DEOWN]
+{\shallow{\gU}{\lv{x}{p}}{\own{\gs}}}
+{\shallow{\gU}{\lv{x}{\deref{p}}}{\gs}}
+\and
+\infer[SI-DEREF]
+{\shallow{\gU}{\lv{x}{p}}{\refval{q}{\gt}} \\ \initShadow{\gt}=\gs}
+{\shallow{\gU}{\lv{x}{\deref{p}}}{\gs}}
+\and
+\infer[SI-PROJ]
+{\shallow{\gU}{\lv{x}{p}}{\subrec{\gs}{i}{n}}}
+{\shallow{\gU}{\lv{x}{\proj{p}{i}}}{\gs_i}}
+\and
+\infer[SI-UNROLL]
+{\shallow{\gU}{\lv{x}{p}}{\roll{\gt'}{\gs}}}
+{\shallow{\gU}{\lv{x}{\unroll{\gt}{p}}}{\gs}}
+\end{mathpar}
+
+\section*{Shadow Typing}
+We need to ensure that the shadows assigned to variables are consistent with the types
+assigned to variables, i.e. we want to avoid situations like
+$\gG(x)=\tyint$ and $\gU(x)=\refval{\qimm}{\tyint}$.
+We can easily do this by defining a typing judgement for shadows and
+defining a well-formedness condition for $\gU$ that ensures it is consistent with $\gG$.
+Similar to typing for layouts, $\uninit$ can only have types that other holes can have.
+\newline
+
+\fbox{$\tc{}{\gs}{\gt}$}
+
+\begin{mathpar}
+\infer[ST-UNINT]
+{ }
+{\tc{}{\uninit}{\tyint}}
+\and
+\infer[ST-UNOWN]
+{ }
+{\tc{}{\uninit}{\own{\gt}}}
+\and
+\infer[ST-UNREF]
+{ }
+{\tc{}{\uninit}{\tyref{\lt}{q}{\gt}}}
+\and
+\infer[ST-UNVAR]
+{ }
+{\tc{}{\uninit}{\subvar{\gt}{i}{n}}}
+\and
+\infer[ST-INT]
+{ }
+{\tc{}{\tyint}{\tyint}}
+\and
+\infer[ST-OWN]
+{\tc{}{\gs}{\gt}}
+{\tc{}{\own{\gs}}{\own{\gt}}}
+\and
+\infer[ST-REF]
+{ }
+{\tc{}{\refval{q}{\gt}}{\tyref{\lt}{q}{\gt}}}
+\and
+\infer[ST-VAR]
+{ }
+{\tc{}{\subvar{\gt}{i}{n}}{\subvar{\gt}{i}{n}}}
+\and
+\infer[ST-REC]
+{\forall i.~\tc{}{\gs_i}{\gt_i}}
+{\tc{}{\subrec{\gs}{i}{n}}{\subrec{\gt}{i}{n}}}
+\and
+\infer[ST-ROLL]
+{\tc{}{\gs}{\sub{X}{\tyfix{X}{\gt}}{\gt}}}
+{\tc{}{\roll{\tyfix{X}{\gt}}{\gs}}{\tyfix{X}{\gt}}}
+\end{mathpar}
+
+\begin{mathpar}
+\mprset{flushleft}
+\infer
+{ 
+\dom{\gG}=\dom{\gU} \\\\
+\forall x \in \dom{\gG}.~\gG(x)~\textrm{closed} \\\\
+\forall x \in \dom{\gG}.~\tc{}{\gU(x)}{\gG(x)}
+}
+{\tc{}{\gU}{\gG}}
+\end{mathpar}
+
+\subsection*{Shallow Preserves Types}
+Just as with \textsc{read}, \textsc{shallow} preserves types.
+
+\begin{lem}[Shallow Type Preservation]
+  If $\tc{}{\gU}{\gG}$, $\tc{\gG}{\lv{x}{p}}{\gt}$, and $\shallow{\gU}{\lv{x}{p}}{\gs}$
+  then $\tc{}{\gs}{\gt}$.
+\end{lem}
+
+\begin{proof}[Shallow Type Preservation]
+  TODO copy over and prettify
+\end{proof}
+
+\section*{Shadow Coherence}
+Of course, we also need to check that our shadow heap correctly models
+the actual heap. For the most part, it is exactly the relation you would expect.
+We require two auxiliary judgments to check for certain initialization states of layouts.
+The $\textsc{init}(H,l)$ judgment checks that $l$ is \emph{fully initialized}, 
+i.e. $\void$ does not occur in any memory reachable from $l$.
+These layouts are safe to use because we cannot access uninitialized memory from them.
+The $\textsc{droppable}(l)$ judgment checks that $l$ owns no initialized heap memory,
+i.e. $\own{\addr{\ga}{r}}$ is not reachable from $l$ except through references.
+These layouts are safe to deallocate because we cannot orphan heap memory by doing so.
+\newline
+
+\fbox{$\tc{H}{l}{\gs}$}
+
+\begin{mathpar}
+\infer[LS-VOID]
+{ }
+{\tc{H}{\void}{\uninit}}
+\and
+\infer[LS-INT]
+{ }
+{\tc{H}{z}{\tyint}}
+\and
+\infer[LS-OWN]
+{\Read{H}{\addr{\ga}{r}}{l} \\ \tc{H}{l}{\gs}}
+{\tc{H}{\own{\addr{\ga}{r}}}{\own{\gs}}}
+\and
+\infer[LS-REF]
+{\Read{H}{\addr{\ga}{r}}{l} \\ \textsc{init}(H,l)}
+{\tc{H}{\refval{q}{\addr{\ga}{r}}}{\refval{q}{\gt}}}
+\and
+\infer[LS-VOIDVAR]
+{ }
+{\tc{H}{\varval{\void}{\void}}{\uninit}}
+\and
+\infer[LS-DROPVAR]
+{\textsc{droppable}(l)}
+{\tc{H}{\varval{i}{l}}{\uninit}}
+\and
+\infer[LS-VAR]
+{\textsc{init}(H,l)}
+{\tc{H}{\varval{i}{l}}{\subvar{\gt}{i}{n}}}
+\and
+\infer[LS-REC]
+{\forall i.~\tc{H}{l_i}{\gs_i}}
+{\tc{H}{\subrec{l}{i}{n}}{\subrec{\gs}{i}{n}}}
+\and
+\infer[LS-ROLL]
+{\tc{H}{l}{\gs}}
+{\tc{H}{\roll{\tyfix{X}{\gt}}{l}}{\roll{\tyfix{X}{\gt}}{\gs}}}
+\end{mathpar}
+
+We formally require our heap to match our shadow heap with the following:
+
+\begin{mathpar}
+\mprset{flushleft}
+\infer
+{ 
+\dom{V}=\dom{\gU} \\\\
+\forall x \in \dom{V}.~\tc{H}{H(V(x))}{\gU(x)}
+}
+{\tc{V}{H}{\gU}}
+\end{mathpar}
+
+\section*{Shadow Preservation}
+We need to tie the shadow of a shallowly initialized path
+to the layout read from a route when the path evaluated to the route.
+This will let us carry guarantees from paths and shadows over to routes and layouts.
+
+\begin{lem}[Shadow Preservation]
+  If $\tc{V}{H}{\gU}$, $\shallow{\gU}{\lv{x}{p}}{\gs}$, 
+  $\ev{V;H}{\lv{x}{p}}{\addr{\ga}{r}}$ , and $\Read{H}{\addr{\ga}{r}}{l}$
+  then $\tc{H}{l}{\gs}$.
+\end{lem}
+
+\begin{proof}[Shadow Preservation]
+  TODO copy and prettify
+\end{proof}
+
+\section*{Path Progress}
+Finally, we have all we need to proof path progress.
+Assuming all our contexts and the heap are well-formed,
+then a shallowly initialized, well-typed path can evaluate to some route.
+We can then rely to path preservation to show that route has the same type as the path.
+Read safety then lets us show that we can read a layout at that route
+and that it has the same type.
+
+\begin{lem}[Path Progress]
+  If $\tc{}{H}{\gS;\gY}$, $\gG;V\vdash\gS$, $\tc{}{\gU}{\gG}$, $\tc{V}{H}{\gU}$,
+  $\tc{\gG}{\lv{x}{p}}{\gt}$, and $\shallow{\gU}{\lv{x}{p}}{\gs}$
+  then there is some $\addr{\ga}{r}$ such that $\ev{V;H}{\lv{x}{p}}{\addr{\ga}{r}}$.
+\end{lem}
+
+\begin{proof}[Path Progress]
+  TODO copy and prettify
+\end{proof}
