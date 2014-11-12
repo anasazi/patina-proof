@@ -1,24 +1,3 @@
-\section*{Types}
-
-Values in Patina can be described by the following types:
-\[
-\begin{array}{lccl}
-\textrm{Lifetime} & \lt & & \\
-\textrm{Type Variable} & X & & \\
-\textrm{Qualifier} & q & \bnfdef & \qimm \bnfalt \qmut \\
-\textrm{Type} & \gt & \bnfdef & \tyint \bnfalt \own{\gt} \bnfalt \tyref{\lt}{q}{\gt} \bnfalt 
-				\subvar{\gt}{i}{n} \bnfalt \subrec{\gt}{i}{n} \bnfalt 
-				\tyfix{X}{\gt} \bnfalt X \\
-\end{array}
-\]
-
-$\own{\gt}$ is a unique pointer to a $\gt$.
-$\tyref{\lt}{q}{\gt}$ is a borrowed reference to a $\gt$
-providing mutability guarantee $q$ for lifetime $\lt$.
-$\subvar{\gt}{i}{n}$ is a variant type.
-$\subrec{\gt}{i}{n}$ is a tuple type.
-Finally, $\tyfix{X}{\gt}$ is a recursive type.
-
 \section*{L-values}
 
 L-values in Patina are a combination of a variable and a path.
@@ -300,3 +279,280 @@ data for a path, a proof that this operation preserves types
 (which itselfs requires typing for this shadow heap),
 a coherence check to ensure the shadow heap models the runtime heap,
 and a proof that a shallowly initialized path evaluates to a readable route.
+
+\section*{Runtime Typing}
+\subsection*{Route Typing}
+Typing routes is much like typing paths; however, the $\pay{r}$ route requires
+special attention. Since this route points to the payload of a variant,
+its type depends upon the value of the discriminant of the variant.
+We handle this with an additional context that records the discriminant value
+of a variant stored at a route.
+
+$$ \gS : \mathrm{Allocation} \to \mathrm{Type}$$
+$$ \gY : \mathrm{Allocation} \times \mathrm{Route} \to \mathrm{Integer} $$
+
+\fbox{$\tc{\gS;\gY}{\addr{\ga}{r}}{\gt} $}
+
+\begin{mathpar}
+\infer[RT-BASE]{\gS(\ga)=\gt}{\tc{\gS;\gY}{\addr{\ga}{\base}}{\gt}}
+\and
+\infer[RT-PROJ]
+  {\tc{\gS;\gY}{\addr{\ga}{r}}{\subrec{\gt}{i}{n}}}
+  {\tc{\gS;\gY}{\addr{\ga}{\proj{r}{i}}}{\gt_i}}
+\and
+\infer[RT-PAY]
+  {\gY(\ga,r)=i \\ \tc{\gS;\gY}{\addr{\ga}{r}}{\subvar{\gt}{i}{n}}}
+  {\tc{\gS;\gY}{\addr{\ga}{\pay{r}}}{\gt_i}}
+\and
+\infer[RT-UNROLL]
+  {\tc{\gS;\gY}{\addr{\ga}{r}}{\tyfix{X}{\gt}}}
+  {\tc{\gS;\gY}{\addr{\ga}{\unroll{\tyfix{X}{\gt}}{r}}}{\sub{X}{\tyfix{X}{\gt}}{\gt}}}
+\end{mathpar}
+
+\subsection*{Layout and Cell Typing}
+Typing for layouts and cells is what you would expect.
+However, we restrict the type of $\void$ to the possible types for other
+kinds of cells, i.e. $\tyint$, unique pointers, and borrowed references.
+This means that multi-cell layout types (variants, tuples, and recursive types) imply
+a non-$\void$ value.
+\newline
+
+\fbox{$\tc{\gS;\gY}{l}{\gt}$}
+
+\begin{mathpar}
+\infer[LT-VOIDINT]
+{ }
+{\tc{\gS;\gY}{\void}{\tyint}}
+\and
+\infer[LT-VOIDOWN]
+{ }
+{\tc{\gS;\gY}{\void}{\own{\gt}}}
+\and
+\infer[LT-VOIDREF]
+{ }
+{\tc{\gS;\gY}{\void}{\tyref{\lt}{q}{\gt}}}
+\and
+\infer[LT-INT]
+{ }
+{\tc{\gS;\gY}{z}{\tyint}}
+\and
+\infer[LT-OWN]
+{\tc{\gS;\gY}{\addr{\ga}{r}}{\gt}}
+{\tc{\gS;\gY}{\own{\addr{\ga}{r}}}{\own{\gt}}}
+\and
+\infer[LT-REF]
+{\tc{\gS;\gY}{\addr{\ga}{r}}{\gt}}
+{\tc{\gS;\gY}{\refval{q}{\addr{\ga}{r}}}{\tyref{\lt}{q}{\gt}}}
+\and
+\infer[LT-VOIDVAR]
+{ }
+{\tc{\gS;\gY}{\varval{\void}{\void}}{\subvar{\gt}{i}{n}}}
+\and
+\infer[LT-VAR]
+{\tc{\gS;\gY}{l}{\gt_i}}
+{\tc{\gS;\gY}{\varval{i}{l}}{\subvar{\gt}{i}{n}}}
+\and
+\infer[LT-REC]
+{\forall i.~\tc{\gS;\gY}{l_i}{\gt_i}}
+{\tc{\gS;\gY}{\subrec{l}{i}{n}}{\subrec{\gt}{i}{n}}}
+\and
+\infer[LT-ROLL]
+{\tc{\gS;\gY}{l}{\sub{X}{\tyfix{X}{\gt}}{\gt}}}
+{\tc{\gS;\gY}{\roll{\tyfix{X}{\gt}}{l}}{\tyfix{X}{\gt}}}
+\end{mathpar}
+
+\subsection*{Heap Well-Formedness}
+With runtime typing now in hand, we can say what it means for the heap to be well-formed.
+We say a heap $H$ is described by a heap type $\gS$ and a discriminant context $\gY$ if
+every allocation in $H$ has the type assigned to it by $\gS$
+and $\gY$ correctly records the discrimiants of all the variants in $H$.
+Formally,
+
+\begin{mathpar}
+\mprset{flushleft}
+\infer
+{ 
+\dom{H} = \dom{\gS} \\\\
+\forall \ga \in \dom(\gS).~\gS(\ga)~\textrm{closed} \\\\
+\forall \ga \in \dom{H}.~\tc{\gS;\gY}{H(\ga)}{\gS(\ga)} \\\\
+\forall (\ga,r) \in \dom{\gY}.~\Read{H}{\addr{\ga}{r}}{\varval{\gY(\ga,r)}{l}}
+}
+{\tc{}{H}{\gS;\gY}}
+\end{mathpar}
+
+\section*{Read Safety}
+We are now in position to prove that our read operation is safe.
+That is, if the heap is well formed and a route is has some type,
+then we can read some layout at that route and that layout has that same type.
+
+\begin{lem}[Read Safety]
+If $\tc{}{H}{\gS;\gY}$ and $\tc{\gS;\gY}{\addr{\ga}{r}}{\gt}$,
+then there is a layout $l$ such that $\Read{H}{\addr{\ga}{r}}{l}$ and $\tc{\gS;\gY}{l}{\gt}$.
+\end{lem}
+
+\begin{proof}[Read Safety]
+  We will use induction on the derivation of $\tc{\gS;\gY}{\addr{\ga}{r}}{\gt}$.
+  \begin{itemize}
+    \item[\textsc{RT-BASE}] Then $r = \base$.
+
+      By inversion, $\gS(\ga)=\gt$.
+
+      From $\tc{}{H}{\gS;\gY}$, we know that $\dom{H}=\dom{\gS}$.
+      Thus, $\exists l.~H(\ga)=l$.
+
+      Then by \textsc{RD-BASE}, we have $\Read{H}{\addr{\ga}{\base}}{l}$.
+
+      Again from $\tc{}{H}{\gS;\gY}$, we know that $\tc{\gS;\gY}{H(\ga)}{\gS(\ga)}$,
+      which is just $\tc{\gS;\gY}{l}{\gt}$ as required.
+    \item[\textsc{RT-PROJ}] Then $r = \proj{r'}{i}$ and $\gt = \gt_i$.
+
+      By inversion, $\tc{\gS;\gY}{\addr{\ga}{r'}}{\subrec{\gt}{i}{n}}$.
+
+      By induction, $\Read{H}{\addr{\ga}{r'}}{l}$
+      and $\tc{\gS;\gY}{l}{\subrec{\gt}{i}{n}}$ for some $l$.
+
+      There is only one rule (\textsc{LT-REC}) for deriving $\tc{\gS;\gY}{l}{\subrec{\gt}{i}{n}}$.
+
+      Thus, by inversion, $l = \subrec{l'}{j}{n}$ 
+      and $\forall j.~\tc{\gS;\gY}{l'_j}{\gt_j}$.
+      Specifically, $\tc{\gS;\gY}{l'_i}{\gt_i}$.
+
+      Then by \textsc{RD-PROJ}, we have $\Read{H}{\addr{\ga}{\proj{r'}{i}}}{l'_i}$.
+    \item[\textsc{RT-PAY}] Then $r = \pay{r'}$ and $\gt = \gt_i$.
+
+      By inversion, $\gY(\ga,r')=i$ and $\tc{\gS;\gY}{\addr{\ga}{r'}}{\subvar{\gt}{i}{n}}$.
+
+      By induction, $\Read{H}{\addr{\ga}{r'}}{l}$
+      and $\tc{\gS;\gY}{l}{\subvar{\gt}{i}{n}}$.
+
+      From $\tc{}{H}{\gS;\gY}$, we know that because $\gY(\ga,r')=i$
+      it follows that $\Read{H}{\addr{\ga}{r'}}{\varval{i}{l'}}$ for some $l'$.
+
+      By Read Uniqueness, we know that $l = \varval{i}{l'}$.
+
+      There is only one rule (\textsc{LT-VAR}) for deriving 
+      $\tc{\gS;\gY}{\varval{i}{l'}}{\subvar{\gt}{i}{n}}$.
+
+      Thus, by inversion, $\tc{\gS;\gY}{l'}{\gt_i}$.
+
+      Then by \textsc{RD-PAY}, we have $\Read{H}{\addr{\ga}{\pay{r'}}}{l'}$.
+    \item[\textsc{RT-UNROLL}] 
+      Then $r = \unroll{\tyfix{X}{\gt'}}{r'}$ and $\gt = \sub{X}{\tyfix{X}{\gt'}}{\gt'}$.
+
+      By inversion, $\tc{\gS;\gY}{\addr{\ga}{r'}}{\tyfix{X}{\gt'}}$.
+
+      By induction, $\Read{H}{\addr{\ga}{r'}}{l}$ 
+      and $\tc{\gS;\gY}{l}{\tyfix{X}{\gt'}}$ for some $l$.
+
+      There is only one rule (\textsc{LT-ROLL}) for deriving $\tc{\gS;\gY}{l}{\tyfix{X}{\gt'}}$.
+
+      Thus, by inversion, $l = \roll{\tyfix{X}{\gt'}}{l'}$
+      and $\tc{\gS;\gY}{l'}{\sub{X}{\tyfix{X}{\gt'}}{\gt'}}$.
+
+      Then by \textsc{RD-UNROLL}, we have
+      $\Read{H}{\addr{\ga}{\unroll{\tyfix{X}{\gt'}}{r'}}}{l'}$.
+  \end{itemize}
+\end{proof}
+
+\section*{Path Type Preservation}
+The final piece we need for preservation is how to relate the typing context $\gG$,
+the variable map $V$, and the heap type $\gS$. This is simply the requirement that
+the map $V$ preserves typing.
+
+\begin{mathpar}
+  \infer
+  {\forall x \in \dom{\gG}.~\gG(x)=\gS(V(x))}
+  {\gG;V\vdash\gS}
+\end{mathpar}
+
+Finally, we can state and prove path type preservation.
+Under well-formed heap and contexts, typed paths evaluate to routes of the same type.
+
+\begin{lem}[Path Type Preservation]
+  If $\tc{}{H}{\gS;\gY}$, $\gG;V\vdash\gS$, $\tc{\gG}{\lv{x}{p}}{\gt}$,
+  and $\ev{V;H}{\lv{x}{p}}{\addr{\ga}{r}}$, then $\tc{\gS;\gY}{\addr{\ga}{r}}{\gt}$.
+\end{lem}
+
+\begin{proof}[Path Type Preservation]
+  We will use induction on the derivation of $\ev{V;H}{\lv{x}{p}}{\addr{\ga}{r}}$.
+  \begin{itemize}
+    \item[PE-BASE] Then $p = \base$ and $r = \base$.
+
+      By inversion, $V(x)=\ga$.
+
+      There is only one rule (\textsc{PT-BASE}) for deriving $\tc{\gG}{\lv{x}{\base}}{\gt}$.
+
+      Thus, by inversion, we have $\gG(x)=\gt$.
+
+      From $\gG;V\vdash\gS$, we know $\gG(x)=\gS(V(x))$. Thus, $\gt=\gS(\ga)$.
+
+      Then by \textsc{RT-BASE}, we have $\tc{\gS;\gY}{\addr{\ga}{\base}}{\gt}$.
+    \item[PE-DEOWN] Then $p = \deref{p'}$.
+
+      By inversion, $\ev{V;H}{\lv{x}{p'}}{\addr{\ga'}{r'}}$
+      and $\Read{H}{\addr{\ga'}{r'}}{\own{\addr{\ga}{r}}}$.
+
+      There are two possible rules for deriving $\tc{\gG}{\lv{x}{\deref{p'}}}{\gt}$.
+      \begin{itemize}
+	\item[PT-DEOWN]
+
+	  By inversion, $\tc{\gG}{\lv{x}{p'}}{\own{\gt}}$.
+
+	  By induction, $\tc{\gS;\gY}{\addr{\ga'}{r'}}{\own{\gt}}$.
+
+	  By Read Safety, we have $\Read{H}{\addr{\ga'}{r'}}{l}$
+	  and $\tc{\gS;\gY}{l}{\own{\gt}}$ for some $l$.
+
+	  By Read Uniqueness, we have $l =\ \own{\addr{\ga}{r}}$.
+
+	  There is only one rule (\textsc{LT-OWN}) for deriving 
+	  $\tc{\gS;\gY}{\own{\addr{\ga}{r}}}{\own{\gt}}$.
+
+	  Thus, by inversion, $\tc{\gS;\gY}{\addr{\ga}{r}}{\gt}$.
+	\item[PT-DEREF]
+
+	  By inversion, $\tc{\gG}{\lv{x}{p'}}{\tyref{\lt}{q}{\gt}}$.
+
+	  By induction, $\tc{\gS;\gY}{\addr{\ga'}{r'}}{\tyref{\lt}{q}{\gt}}$.
+
+	  By Read Safety, we have $\Read{H}{\addr{\ga'}{r'}}{l}$
+	  and $\tc{\gS;\gY}{l}{\tyref{\lt}{q}{\gt}}$ for some $l$.
+
+	  By Read Uniqueness, we have $l =\ \own{\addr{\ga}{r}}$.
+
+	  There are no rules for deriving
+	  $\tc{\gS;\gY}{\own{\addr{\ga}{r}}}{\tyref{\lt}{q}{\gt}}$.
+
+	  Thus, by inversion, this case is impossible.
+      \end{itemize}
+    \item[PE-DEREF] 
+      Similar to the \textsc{PE-DEOWN} case, but switching the roles of
+      \textsc{PT-DEOWN} and \textsc{PT-DEREF}.
+    \item[PE-PROJ] Then $p = \proj{p'}{i}$ and $r = \proj{r'}{i}$.
+
+      By inversion, $\ev{V;H}{\lv{x}{p'}}{\addr{\ga}{r'}}$.
+
+      There is only one rule (\textsc{PT-PROJ}) for deriving $\tc{\gG}{\lv{x}{\proj{p'}{i}}}{\gt}$.
+
+      Thus, by inversion, we have $\gt = \gt_i$ and $\tc{\gG}{\lv{x}{p'}}{\subrec{\gt}{i}{n}}$.
+
+      By induction, we have $\tc{\gS;\gY}{\addr{\ga}{r'}}{\subrec{\gt}{i}{n}}$.
+
+      Then by \textsc{RT-PROJ}, we have $\tc{\gS;\gY}{\addr{\ga}{\proj{r'}{i}}}{\gt_i}$.
+    \item[PE-UNROLL] Then $p = \unroll{\gt'}{p'}$ and $r = \unroll{\gt'}{r'}$.
+
+      By inversion, $\ev{V;H}{\lv{x}{p'}}{\addr{\ga}{r'}}$.
+
+      There is only one rule (\textsc{PT-UNROLL}) for deriving
+      $\tc{\gG}{\lv{x}{\unroll{\gt'}{p'}}}{\gt}$.
+
+      Thus, by inversion, we have $\gt' = \tyfix{X}{\gt''}$,
+      $\gt = \sub{X}{\tyfix{X}{\gt''}}{\gt''}$, and
+      $\tc{\gG}{\lv{x}{p'}}{\tyfix{X}{\gt''}}$.
+
+      By induction, we have $\tc{\gS;\gY}{\addr{\ga}{r'}}{\tyfix{X}{\gt''}}$.
+
+      Then by \textsc{RT-UNROLL}, we have
+      $\tc{\gS;\gY}{\addr{\ga}{\unroll{\tyfix{X}{\gt''}}{r'}}}{\sub{X}{\tyfix{X}{\gt''}}{\gt''}}$.
+  \end{itemize}
+\end{proof}

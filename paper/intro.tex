@@ -1,2 +1,41 @@
-\section*{intro}
-intro
+%\section*{Introduction}
+%Rust claims to ensure memory safety without a garbage collector.
+%We would like to verify this claim.
+
+%Rust ensures safety by combining affine types with checked borrowed references.
+%Affine types ensure that every piece of memory has a unqiue owner responsible for deallocation.
+%Borrowed references allow limited aliasing that avoids 
+%aliased, mutable memory and dangling references
+%Rust's usage of affine types for memory management is standard except for one addition.
+%Rust allows consumed affine cells that are still in scope to be re-initialized and used again.
+%Rust's borrowed references utilize a region system very similar to Cyclone's.
+%The primary difference is in the details of the borrow checker.
+%Our main goal is to prove that these differences do not introduce unsoundness.
+
+%\section*{Patina}
+%We work with a small core model of Rust called Patina, which focuses
+%on the memory management aspects of Rust.
+%Unlike Rust, Patina uses explicit heap deallocation and does not support closures.
+%Patina has three layers: L-values, R-values, and statements.
+%We will discuss them in order.
+
+\section*{Types}
+
+Values in Patina can be described by the following types:
+\[
+\begin{array}{lccl}
+\textrm{Lifetime} & \lt & & \\
+\textrm{Type Variable} & X & & \\
+\textrm{Qualifier} & q & \bnfdef & \qimm \bnfalt \qmut \\
+\textrm{Type} & \gt & \bnfdef & \tyint \bnfalt \own{\gt} \bnfalt \tyref{\lt}{q}{\gt} \bnfalt 
+				\subvar{\gt}{i}{n} \bnfalt \subrec{\gt}{i}{n} \bnfalt 
+				\tyfix{X}{\gt} \bnfalt X \\
+\end{array}
+\]
+
+$\own{\gt}$ is a unique pointer to a $\gt$.
+$\tyref{\lt}{q}{\gt}$ is a borrowed reference to a $\gt$
+providing mutability guarantee $q$ for lifetime $\lt$.
+$\subvar{\gt}{i}{n}$ is a variant type.
+$\subrec{\gt}{i}{n}$ is a tuple type.
+Finally, $\tyfix{X}{\gt}$ is a recursive type.
