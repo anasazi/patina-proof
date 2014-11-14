@@ -19,8 +19,34 @@
 %Patina has three layers: L-values, R-values, and statements.
 %We will discuss them in order.
 
-\section*{Types}
+\section*{Overview}
+Rust makes strong claims about ensuring memory safety without garbage collection.
+We would like to prove that those claims are true.
+To that end, we use a small model of Rust, called Patina, that characterizes the key
+features of Rust under the most suspicion, namely its memory management.
 
+Rust memory management has two goals:
+no memory should ever be orphaned and no uninitialized memory should ever be read.
+Rust tries to achieve this by maintaining two invariants:
+all memory has a unique owner responsible for deallocating it and
+no memory is ever simultaneously aliased and mutable.
+These invariants simplify the situation enough so that
+Rust only needs to track which L-values are uninitialized and which have been borrowed.
+Ownership tracking of heap memory is managed by unique pointers.
+Safe aliasing is managed by borrowed references.
+
+The Patina model has three layers.
+The innermost layer deals with L-values and ensures no uninitialized pointer
+ever needs to be dereferenced. It also ensures that initialization data correctly
+models the runtime memory.
+The middle layer deals with R-values.
+It ensures that an L-values used do not violate initialization or borrow restrictions.
+It also ensures that borrowed references are not created unless they are safe.
+The outer layer deals with statements.
+It mostly just chains together the guarantees of the L-value and R-value layers.
+However, it is also responsible for ensuring no orphans would be created when deallocating memory.
+
+\section*{Types}
 Values in Patina can be described by the following types:
 \[
 \begin{array}{lccl}
