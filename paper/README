@@ -1,0 +1,3 @@
+main.tex is the top level file
+
+I typically use latexmk to build everything
