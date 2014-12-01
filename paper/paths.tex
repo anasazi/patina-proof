@@ -257,8 +257,25 @@ so that we can properly state and prove our type preservation lemmas.
 Typing routes is much like typing paths; however, the $\pay{r}$ route requires
 special attention. Since this route points to the payload of a variant,
 its type depends upon the value of the discriminant of the variant.
+This is used for handling match by reference.
+The match arms have a pointer to the payload in scope, but the type of the
+payload depends upon the value of the discrimiant.
+For example,
+\begin{verbatim}
+  // x: <[], int> is a Patina encoding of Option<int>
+  match x by imm y // y will have route `pay r' were `r' is the route of x
+    // [] (None) case
+    {
+      // y: & imm [] is in scope here
+    }
+    // int (Some) case
+    {
+      // y: & imm int is in scope here
+    }
+\end{verbatim}
+
 We handle this with an additional context that records the discriminant value
-of a variant stored at a route.
+of a variant stored at a route. 
 
 $$ \gS : \mathrm{Allocation} \to \mathrm{Type}$$
 $$ \gY : \mathrm{Allocation} \times \mathrm{Route} \to \mathrm{Integer} $$
@@ -510,6 +527,62 @@ Therefore, the reference hole simply records the type of the reference.
 For unique pointers, there is no path that could possibly be used
 (otherwise the pointer would not be unique).
 Therefore, the unique pointer hole records the shadow of the pointed-to heap memory.
+
+Two examples are useful for understanding shadows.
+First, consider nested pointers:
+\begin{verbatim}
+{
+  let x: ~~int = ~~3;
+  // Here the shadow of x is `~ ~ int'
+  // x, *x, and **x are all initialized
+
+  let y: ~int = *x; // *x is now deinitialized
+  // Here the shadow of x is `~ uninit' and the shadow of y is `~ int'
+  // x is initialized, by *x and **x are not
+  // both y and *y are initialized
+}
+\end{verbatim}
+
+Second, consider tuples:
+\begin{verbatim}
+{
+  let x: [~int, ~int] = [~1, ~2];
+  // Here the shadow of x is [~int, ~int]
+  // x, x.1, *(x.1), x.2, and *(x.2) are all initialized
+
+  free(x.1);
+  // Here the shadow of x is [uninit, ~int]
+  // x, x.1, x.2, and *(x.2) are all initialized, but *(x.1) is not
+}
+\end{verbatim}
+
+The shadow heap gives the typechecker enough information 
+to ensure we do not use or dereference uninitialized memory.
+For example, here is how it can catch dereferencing a null pointer:
+\begin{verbatim}
+{
+  let x: ~~int = ~~3;
+  free(*x); // deallocates **x, leaving *x uninitialized
+  // at this point the shadow of x is `~ uninit'
+  let y: int = **x; // ERROR! dereferences a null pointer *x
+  // the type checker know the shadow of *x is `uninit'
+  // if a further dereference was allowed (i.e. **x), a null pointer derefernce would occur
+  // the type checker can avoid null pointer dereferences by forbidding derefs of `uninit' data
+
+}
+\end{verbatim}
+
+It can also catch a missing free that would orphan memory.
+\begin{verbatim}
+{
+  let x: ~int = ~3;
+  // the shadow of x is `~ int'
+
+  // the stack variable x will be popped off the stack, orphaning the heap memory at *x
+  // the type checker can identify this error by seeing that the shadow of x contains `~' data
+  // by requiring that shadows cannot contain `~' when freed, the type checker prevents leaks
+}
+\end{verbatim}
 
 \section*{Checking Shallow Initialization}
 We will need an analogue of \textsc{read} for our shadow heap for the
@@ -767,6 +840,7 @@ are fully initialized.
 The $\textsc{droppable}(l)$ judgment checks that $l$ owns no initialized heap memory,
 i.e. $\own{\addr{\ga}{r}}$ is not reachable from $l$ except through references.
 These layouts are safe to deallocate because we cannot orphan heap memory by doing so.
+The $\tc{V}{H}{\gU}$ judgment ensures that the shadow heap corresponds to the real heap.
 \newline
 
 %\fbox{$\textsc{init}(H,l)$}
