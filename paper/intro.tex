@@ -46,7 +46,7 @@ The outer layer deals with statements.
 It mostly just chains together the guarantees of the L-value and R-value layers.
 However, it is also responsible for ensuring no orphans would be created when deallocating memory.
 
-\subsection*{Unique Pointers}
+\subsection*{Unique Pointers in Rust}
 In Rust, unique pointers are the owners of heap memory.
 Heap memory is allocated when a new unique pointer is created.
 Heap memory is freed when a unique pointer falls out of scope.
@@ -88,6 +88,8 @@ Unique pointers can also be freed if they would be orphaned by assignment.
 
 This is not a dynamic check. 
 The compiler detects when heap memory should be freed and inserts the necessary code.
+
+\subsection*{Unique Pointers in Patina}
 To check that the Rust compiler does this correctly, Patina uses a shallow free statement.
 The only way to deallocate a unique pointer in Patina is with these explicit frees.
 \begin{verbatim}
