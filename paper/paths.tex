@@ -135,6 +135,8 @@ Unlike paths, there is no dereference route.
 This forces any pointer following into path evaluation (into routes)
 rather than doing so while reading memory at a route.
 The address placeholder from before is simply a pair of an allocation label and a route.
+The exception is that unique pointers needs only an allocation since a unique pointer
+always points to a complete heap allocation.
 That is:
 
 \[
@@ -143,7 +145,7 @@ That is:
 \textrm{Allocation} & \ga & & \\
 \textrm{Route} & r & \bnfdef & \base \bnfalt \proj{r}{i} \bnfalt \pay{r} \bnfalt \unroll{\gt}{r} \\
 \textrm{Cell} & c & \bnfdef & \void \bnfalt z \bnfalt 
-			      \own{\addr{\ga}{r}} \bnfalt \refval{q}{\addr{\ga}{r}} \\
+			      \own{\ga} \bnfalt \refval{q}{\addr{\ga}{r}} \\
 \textrm{Layout} & l & \bnfdef & c \bnfalt \varval{c}{l} \bnfalt 
 			       \subrec{l}{i}{n} \bnfalt \roll{\gt}{l} \\
 \end{array}
@@ -219,8 +221,8 @@ $$ V : \mathrm{Variable} \to \mathrm{Allocation} $$
 \begin{mathpar}
 \infer[PE-BASE]{V(x)=\ga}{\ev{V;H}{\lv{x}{\base}}{\addr{\ga}{\base}}} \and
 \infer[PE-DEOWN]
-  {\ev{V;H}{\lv{x}{p}}{\addr{\ga}{r}} \\ \Read{H}{\addr{\ga}{r}}{\own{\addr{\ga'}{r'}}}}
-  {\ev{V;H}{\lv{x}{\deref{p}}}{\addr{\ga'}{r'}}} \and
+  {\ev{V;H}{\lv{x}{p}}{\addr{\ga}{r}} \\ \Read{H}{\addr{\ga}{r}}{\own{\ga'}}}
+  {\ev{V;H}{\lv{x}{\deref{p}}}{\addr{\ga'}{\base}}} \and
 \infer[PE-DEREF]
   {\ev{V;H}{\lv{x}{p}}{\addr{\ga}{r}} \\ \Read{H}{\addr{\ga}{r}}{\refval{q}{\addr{\ga'}{r'}}}}
   {\ev{V;H}{\lv{x}{\deref{p}}}{\addr{\ga'}{r'}}} \and
@@ -326,8 +328,8 @@ a non-$\void$ value.
 {\tc{\gS;\gY}{z}{\tyint}}
 \and
 \infer[LT-OWN]
-{\tc{\gS;\gY}{\addr{\ga}{r}}{\gt}}
-{\tc{\gS;\gY}{\own{\addr{\ga}{r}}}{\own{\gt}}}
+{\tc{\gS;\gY}{\addr{\ga}{\base}}{\gt}}
+{\tc{\gS;\gY}{\own{\ga}}{\own{\gt}}}
 \and
 \infer[LT-REF]
 {\tc{\gS;\gY}{\addr{\ga}{r}}{\gt}}
@@ -451,9 +453,9 @@ Under well-formed heap and contexts, typed paths evaluate to routes of the same 
       Thus, by inversion, we have $\gG(x)=\gt$. \\
       From $\gG;V\vdash\gS$, we know $\gG(x)=\gS(V(x))$. Thus, $\gt=\gS(\ga)$. \\
       Then by \textsc{RT-BASE}, we have $\tc{\gS;\gY}{\addr{\ga}{\base}}{\gt}$.
-    \item[PE-DEOWN] Then $p = \deref{p'}$. \\
+    \item[PE-DEOWN] Then $p = \deref{p'}$ and $r = \base$. \\
       By inversion, $\ev{V;H}{\lv{x}{p'}}{\addr{\ga'}{r'}}$
-      and $\Read{H}{\addr{\ga'}{r'}}{\own{\addr{\ga}{r}}}$. \\
+      and $\Read{H}{\addr{\ga'}{r'}}{\own{\ga}}$. \\
       There are two possible rules for deriving $\tc{\gG}{\lv{x}{\deref{p'}}}{\gt}$.
       \begin{itemize}
 	\item[PT-DEOWN]
@@ -461,18 +463,18 @@ Under well-formed heap and contexts, typed paths evaluate to routes of the same 
 	  By induction, $\tc{\gS;\gY}{\addr{\ga'}{r'}}{\own{\gt}}$. \\
 	  By Read Safety, we have $\Read{H}{\addr{\ga'}{r'}}{l}$
 	  and $\tc{\gS;\gY}{l}{\own{\gt}}$ for some $l$. \\
-	  By Read Uniqueness, we have $l =\ \own{\addr{\ga}{r}}$. \\
+	  By Read Uniqueness, we have $l =\ \own{\ga}$. \\
 	  There is only one rule (\textsc{LT-OWN}) for deriving 
-	  $\tc{\gS;\gY}{\own{\addr{\ga}{r}}}{\own{\gt}}$. \\
-	  Thus, by inversion, $\tc{\gS;\gY}{\addr{\ga}{r}}{\gt}$.
+	  $\tc{\gS;\gY}{\own{\ga}}{\own{\gt}}$. \\
+	  Thus, by inversion, $\tc{\gS;\gY}{\addr{\ga}{\base}}{\gt}$.
 	\item[PT-DEREF]
 	  By inversion, $\tc{\gG}{\lv{x}{p'}}{\tyref{\lt}{q}{\gt}}$. \\
 	  By induction, $\tc{\gS;\gY}{\addr{\ga'}{r'}}{\tyref{\lt}{q}{\gt}}$. \\
 	  By Read Safety, we have $\Read{H}{\addr{\ga'}{r'}}{l}$
 	  and $\tc{\gS;\gY}{l}{\tyref{\lt}{q}{\gt}}$ for some $l$. \\
-	  By Read Uniqueness, we have $l =\ \own{\addr{\ga}{r}}$. \\
+	  By Read Uniqueness, we have $l =\ \own{\ga}$. \\
 	  There are no rules for deriving
-	  $\tc{\gS;\gY}{\own{\addr{\ga}{r}}}{\tyref{\lt}{q}{\gt}}$. \\
+	  $\tc{\gS;\gY}{\own{\ga}}{\tyref{\lt}{q}{\gt}}$. \\
 	  Thus, by inversion, this case is impossible.
       \end{itemize}
     \item[PE-DEREF] 
@@ -911,8 +913,8 @@ The $\tc{V}{H}{\gU}$ judgment ensures that the shadow heap corresponds to the re
 {\tc{H}{z}{\tyint}}
 \and
 \infer[LS-OWN]
-{\Read{H}{\addr{\ga}{r}}{l} \\ \tc{H}{l}{\gs}}
-{\tc{H}{\own{\addr{\ga}{r}}}{\own{\gs}}}
+{\Read{H}{\addr{\ga}{\base}}{l} \\ \tc{H}{l}{\gs}}
+{\tc{H}{\own{\ga}}{\own{\gs}}}
 \and
 \infer[LS-REF]
 {\Read{H}{\addr{\ga}{r}}{l} \\ \tc{H}{l}{\initShadow{\gt}}}
@@ -977,21 +979,22 @@ so that the resulting layout is correctly described by the shadow.
       By $\tc{V}{H}{\gU}$, we have $\tc{H}{H(V(x))}{\gU(x)}$. \\
       However, this is just $\tc{H}{l}{\gs}$ as required.
     \item[\textsc{PE-DEOWN}] 
-      Then $p = \deref{p'}$.\\
+      Then $p = \deref{p'}$ and $r = \base$.\\
       By inversion, $\ev{V;H}{\lv{x}{p'}}{\addr{\ga'}{r'}}$ 
-      and $\Read{H}{\addr{\ga'}{r'}}{\own{\addr{\ga}{r}}}$. \\
+      and $\Read{H}{\addr{\ga'}{r'}}{\own{\ga}}$. \\
       There are two possible rules for deriving $\shallow{\gU}{\lv{x}{\deref{p'}}}{\gs}$.
       \begin{itemize}
 	\item[\textsc{SI-DEOWN}]
 	  By inversion, $\shallow{\gU}{\lv{x}{p'}}{\own{\gs}}$.\\
-	  By induction, $\tc{H}{\own{\addr{\ga}{r}}}{\own{\gs}}$.\\
+	  By induction, $\tc{H}{\own{\ga}}{\own{\gs}}$.\\
 	  There is only one rule (\textsc{LS-OWN}) for deriving this.\\
-	  Thus, by inversion, we have $\Read{H}{\addr{\ga}{r}}{l'}$ and $\tc{H}{l'}{\gs}$.\\
+	  Thus, by inversion, we have $\Read{H}{\addr{\ga}{\base}}{l'}$ and $\tc{H}{l'}{\gs}$.\\
 	  By Read Uniqueness, we have $l' = l$.\\
 	  Ergo, $\tc{H}{l}{\gs}$ as required.
 	\item[\textsc{SI-DEREF}]
-	  By inversion, $\shallow{\gU}{\lv{x}{p'}}{\refval{q}{\gt}}$ and $\initShadow{\gt}=\gs$.\\
-	  By induction, $\tc{H}{\own{\addr{\ga}{r}}}{\refval{q}{\gt}}$.\\
+	  By inversion, $\shallow{\gU}{\lv{x}{p'}}{\refval{q}{\gt}}$ 
+	  and $\initShadow{\gt}=\gs$.\\
+	  By induction, $\tc{H}{\own{\ga}}{\refval{q}{\gt}}$.\\
 	  There are no rules for deriving this.\\
 	  Thus, by inversion, this case is impossible.
       \end{itemize}
@@ -1007,7 +1010,8 @@ so that the resulting layout is correctly described by the shadow.
 	  There are no rules for deriving this.\\
 	  Thus, by inversion, this case is impossible.
 	\item[\textsc{SI-DEREF}]
-	  By inversion, $\shallow{\gU}{\lv{x}{p'}}{\refval{q}{\gt}}$ and $\initShadow{\gt}=\gs$.\\
+	  By inversion, $\shallow{\gU}{\lv{x}{p'}}{\refval{q}{\gt}}$ 
+	  and $\initShadow{\gt}=\gs$.\\
 	  By induction, $\tc{H}{\refval{q}{\addr{\ga}{r}}}{\refval{q}{\gt}}$.\\
 	  There is only one rule (\textsc{LS-REF}) for deriving this.\\
 	  Thus, by induction, we have $\Read{H}{\addr{\ga}{r}}{l'}$
@@ -1083,12 +1087,12 @@ the higher layers of Patina.
 	  and $\tc{\gS;\gY}{l}{\own{\gt}}$ for some $l$.\\
 	  By Shadow Preservation, $\tc{H}{l}{\own{\gs}}$.\\
 	  There is only one rule (\textsc{LS-OWN}) for deriving this.\\
-	  Thus, by inversion, we have $l =\ \own{\addr{\ga'}{r'}}$,
-	  $\Read{H}{\addr{\ga'}{r'}}{l'}$, and $\tc{H}{l'}{\gs}$.\\
+	  Thus, by inversion, we have $l =\ \own{\ga'}$,
+	  $\Read{H}{\addr{\ga'}{\base}}{l'}$, and $\tc{H}{l'}{\gs}$.\\
 	  Using \textsc{PE-DEOWN} with
 	  $\ev{V;H}{\lv{x}{p'}}{\addr{\ga}{r}}$ and
-	  $\Read{H}{\addr{\ga}{r}}{\own{\addr{\ga'}{r'}}}$, \\ 
-	  we get $\ev{V;H}{\lv{x}{\deref{p'}}}{\addr{\ga'}{r'}}$,
+	  $\Read{H}{\addr{\ga}{r}}{\own{\ga'}}$, \\ 
+	  we get $\ev{V;H}{\lv{x}{\deref{p'}}}{\addr{\ga'}{\base}}$,
 	  which is what was required.
 	\item[\textsc{SI-DEREF}]
 	  By inversion, $\shallow{\gU}{\lv{x}{p'}}{\refval{q}{\gt}}$.\\
