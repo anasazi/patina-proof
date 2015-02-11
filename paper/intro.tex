@@ -1,24 +1,3 @@
-%\section*{Introduction}
-%Rust claims to ensure memory safety without a garbage collector.
-%We would like to verify this claim.
-
-%Rust ensures safety by combining affine types with checked borrowed references.
-%Affine types ensure that every piece of memory has a unqiue owner responsible for deallocation.
-%Borrowed references allow limited aliasing that avoids 
-%aliased, mutable memory and dangling references
-%Rust's usage of affine types for memory management is standard except for one addition.
-%Rust allows consumed affine cells that are still in scope to be re-initialized and used again.
-%Rust's borrowed references utilize a region system very similar to Cyclone's.
-%The primary difference is in the details of the borrow checker.
-%Our main goal is to prove that these differences do not introduce unsoundness.
-
-%\section*{Patina}
-%We work with a small core model of Rust called Patina, which focuses
-%on the memory management aspects of Rust.
-%Unlike Rust, Patina uses explicit heap deallocation and does not support closures.
-%Patina has three layers: L-values, R-values, and statements.
-%We will discuss them in order.
-
 \section*{Overview}
 Rust makes strong claims about ensuring memory safety without garbage collection.
 We would like to prove that those claims are true.
@@ -122,10 +101,6 @@ Finally, the free statement requires that the pointer is unaliased, preventing d
 Borrowed references are a means to provide safe, temporary aliases in Rust.
 They do so by enforcing two invariants.
 The first is that references are always valid.
-%They do so by enforcing two invariants: 
-%references are always valid and
-%no memory is ever simultaneously aliased and mutable.
-%As with unique pointers, these are static checks.
 \begin{verbatim}
 {
   let x: int; // An uninitialized stack integer

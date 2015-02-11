@@ -39,51 +39,6 @@ $$ \gG : \mathrm{Variable} \to \mathrm{Type} $$
 {\tc{\gG}{\lv{x}{\unroll{\tyfix{X}{\gt}}{p}}}{\sub{X}{\tyfix{X}{\gt}}{\gt}}}
 \end{mathpar}
 
-%Unsurprisingly, path typing is unique.
-%\begin{lem}[Path Type Uniqueness]
-%  If $\tc{\gG}{\lv{x}{p}}{\gt}$ and $\tc{\gG}{\lv{x}{p}}{\gt'}$ then $\gt = \gt' $.
-%\end{lem}
-%
-%\begin{proof}[Path Type Uniqueness]
-%  We will use induction on the derivation of $\tc{\gG}{\lv{x}{p}}{\gt}$.
-%  \begin{itemize}
-%    \item[\textsc{PT-BASE}] Then $p = \base$. \\
-%      By inversion, $\gG(x)=\gt$. \\
-%      There is only one possible rule (\textsc{PT-BASE}) for 
-%      deriving $\tc{\gG}{\lv{x}{\base}}{\gt'}$ \\
-%      Ergo, by inversion, $\gG(x)=\gt'$. \\
-%      Thus, $\gt = \gt'$.
-%    \item[\textsc{PT-DEOWN}] Then $p = \deref{p'}$. \\
-%      By inversion, $\tc{\gG}{\lv{x}{p'}}{\own{\gt}}$. \\
-%      There are two possible rules for deriving $\tc{\gG}{\lv{x}{\deref{p'}}}{\gt'}$.
-%      \begin{itemize}
-%	\item[\textsc{PT-DEOWN}]
-%	  By inversion, $\tc{\gG}{\lv{x}{p'}}{\own{\gt'}}$. \\
-%	  By induction $\own{\gt} =\ \own{\gt'}$. \\
-%	  Ergo $\gt = \gt'$.
-%	\item[\textsc{PT-DEREF}]
-%	  By inversion, $\tc{\gG}{\lv{x}{p'}}{\tyref{\lt}{q}{\gt'}}$. \\
-%	  By induction $\own{\gt} = \tyref{\lt}{q}{\gt'}$, a contradiction. \\
-%	  Thus, this case is impossible.
-%      \end{itemize}
-%    \item[\textsc{PT-DEREF}] Then $p = \deref{p'}$. \\
-%      Similar to the \textsc{PT-DEOWN} case, 
-%      but swapping the roles of \textsc{PT-DEOWN} and \textsc{PT-DEREF}.
-%    \item[\textsc{PT-PROJ}] Then $p = \proj{p'}{i}$ and $\gt = \gt_i$. \\
-%      By inversion, $\tc{\gG}{\lv{x}{p'}}{\subrec{\gt}{i}{n}}$. \\
-%      There is only one rule (\textsc{PT-PROJ}) for deriving $\tc{\gG}{\lv{x}{\proj{p'}{i}}}{\gt'}$. \\
-%      Thus, by inversion, $\gt' = \gt'_i$ and $\tc{\gG}{\lv{x}{p'}}{\subrec{\gt'}{i}{n'}}$. \\
-%      By induction, $\subrec{\gt}{i}{n} = \subrec{\gt'}{i}{n'}$. \\
-%      Ergo $n = n'$ and $\gt_i = \gt'_i$.
-%    \item[\textsc{PT-UNROLL}] 
-%      Then $p = \unroll{\tyfix{X}{\gt_0}}{p'}$ and $\gt = \sub{X}{\tyfix{X}{\gt_0}}{\gt_0}$. \\
-%      There is only one rule (\textsc{PT-UNROLL}) for deriving
-%      $\tc{\gG}{\lv{x}{\unroll{\tyfix{X}{\gt_0}}{p'}}}{\gt'}$. \\
-%      Thus, by inversion, $\gt' = \sub{X}{\tyfix{X}{\gt_0}}{\gt_0}$. \\
-%      Ergo $\gt = \sub{X}{\tyfix{X}{\gt_0}}{\gt_0} = \gt'$.
-%  \end{itemize}
-%\end{proof}
-
 \section*{Runtime Memory}
 
 \subsection*{Representation and Addressing}
@@ -237,22 +192,6 @@ $$ V : \mathrm{Variable} \to \mathrm{Allocation} $$
 Our core operations are now defined,
 but we still need to describe the typing our runtime data
 so that we can properly state and prove our type preservation lemmas.
-
-%With path typing and evaluation now defined, we would like to prove progress
-%and preservation for them. Preservation will require we define typing for
-%runtime data (routes, cells, and layouts), which involves a slight bit of trickery
-%around variant discriminants and the payload route.
-
-%Progress will require a way to guarantee that the necessary \textsc{read}s 
-%can be completed, i.e. any pointers we need to dereference are in fact initialized
-%(a property we call \emph{shallow initialization}).
-%We will accomplish this by using a kind of shadow heap, which will simply track
-%initialization rather than values.
-%This will require an analogue of \textsc{read} that extracts the initialization
-%data for a path, a proof that this operation preserves types 
-%(which itselfs requires typing for this shadow heap),
-%a coherence check to ensure the shadow heap models the runtime heap,
-%and a proof that a shallowly initialized path evaluates to a readable route.
 
 \section*{Runtime Typing}
 \subsection*{Route Typing}
@@ -832,10 +771,6 @@ of certain subcases of dereferences in later proofs.
 \section*{Shadow Coherence}
 Of course, we also need to check that our shadow heap correctly models
 the actual heap. For the most part, it is exactly the relation you would expect.
-%We require two auxiliary judgments to check for certain initialization states of layouts.
-%The $\textsc{init}(H,l)$ judgment checks that $l$ is \emph{fully initialized}, 
-%i.e. $\void$ does not occur in any memory reachable from $l$.
-%These layouts are safe to use because we cannot access uninitialized memory from them.
 The use of \textsc{init} in \textsc{LS-REF} and \textsc{LS-VAR} ensures that
 the pointees of borrowed references and the payload of initialized variants
 are fully initialized.
@@ -844,34 +779,6 @@ i.e. $\own{\addr{\ga}{r}}$ is not reachable from $l$ except through references.
 These layouts are safe to deallocate because we cannot orphan heap memory by doing so.
 The $\tc{V}{H}{\gU}$ judgment ensures that the shadow heap corresponds to the real heap.
 \newline
-
-%\fbox{$\textsc{init}(H,l)$}
-
-%\begin{mathpar}
-%\infer[I-INT]
-%{ }
-%{\textsc{init}(H,z)}
-%\and
-%\infer[I-OWN]
-%{\Read{H}{\addr{\ga}{r}}{l} \\ \textsc{init}(H,l)}
-%{\textsc{init}(H,\own{\addr{\ga}{r}})}
-%\and
-%\infer[I-REF]
-%{\Read{H}{\addr{\ga}{r}}{l} \\ \textsc{init}(H,l)}
-%{\textsc{init}(H,\refval{q}{\addr{\ga}{r}})}
-%\and
-%\infer[I-VAR]
-%{\textsc{init}(H,c) \\ \textsc{init}(H,l)}
-%{\textsc{init}(H,\varval{c}{l})}
-%\and
-%\infer[I-REC]
-%{\forall i.~\textsc{init}(H,l_i)}
-%{\textsc{init}(H,\subrec{l}{i}{n})}
-%\and
-%\infer[I-ROLL]
-%{\textsc{init}(H,l)}
-%{\textsc{init}(H,\roll{\gt}{l})}
-%\end{mathpar}
 
 \fbox{$\textsc{droppable}(l)$}
 
@@ -956,9 +863,6 @@ The second main preservation lemma for our core operations.
 The initialization data, in the form of a shadow,
 is preserved by path evaulation and \textsc{read}
 so that the resulting layout is correctly described by the shadow.
-%We need to tie the shadow of a shallowly initialized path
-%to the layout read from a route when the path evaluated to the route.
-%This will let us carry guarantees from paths and shadows over to routes and layouts.
 
 \begin{lem}[Shadow Preservation]
   If $\tc{V}{H}{\gU}$, $\shallow{\gU}{\lv{x}{p}}{\gs}$, 
