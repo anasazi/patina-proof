@@ -540,7 +540,7 @@ First, consider nested pointers:
 
   let y: ~int = *x; // *x is now deinitialized
   // Here the shadow of x is `~ uninit' and the shadow of y is `~ int'
-  // x is initialized, by *x and **x are not
+  // x is initialized, but *x and **x are not
   // both y and *y are initialized
 }
 \end{verbatim}
