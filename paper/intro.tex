@@ -97,65 +97,162 @@ Finally, the free statement requires that the pointer is unaliased, preventing d
 }
 \end{verbatim}
 
-\subsection*{Borrowed References}
-Borrowed references are a means to provide safe, temporary aliases in Rust.
-They do so by enforcing two invariants.
-The first is that references are always valid.
+\subsection*{Borrowed Referenced REDUX}
+Often, particularly in functions, we want to use some memory, but do not intend to free it.
+That is, we want to borrow access to memory owned by something else.
+This is fine for copyable values, like integers, 
+but is tedious for noncopyable values such as unique pointers.
+To avoid freeing a unique pointer argument at the end of the function body,
+it must be returned from the function.
+Effectively, the programmer must thread noncopyable values through their function calls.
 \begin{verbatim}
+fn foo(x: ~int) -> (int, ~int) {
+  return (*x + 1, x)
+}
+
 {
-  let x: int; // An uninitialized stack integer
-  let y: &int = &x; // ERROR! *y would point to uninitialized memory
+  let x1: ~int = ~1;
+  let (y,x2): (int, ~int) = foo(x);
+  // y = 2, x1 is no longer valid, x2 = ~1
 }
 \end{verbatim}
-This also extends to cases where the referent falls out of scope too soon.
+
+Borrowed references allow programmers to have temporary access to a value,
+but they do not confer ownership so this tedium is not necessary.
+\begin{verbatim}
+fn foo(x: &int) -> int {
+  return (*x + 1)
+}
+
+{
+  let x: ~int = ~1;
+  let y: int = foo(&*x);
+  // x = ~1, y = 2
+}
+\end{verbatim}
+
+However, unrestricted borrowed references would open a hole in our memory safety
+by enabling aliased, mutable memory.
 \begin{verbatim}
 {
-  let y: &int;
+  let x: ~int = ~1;
+  let y: &~int = &x; // x and *y are the same memory location
+  let z: ~int = x; // x is no longer usable - effectively x is uninitialized memory
+  let w: int = **y; // ERROR! *y is uninitialized now, so **y dereferences a null pointer!
+}
+
+{
+  let x: &int;
   {
-    let x: int = 3;
-    y = &x; // ERROR! x does not live long enough
+    let y: int = 3;
+    y = &x;
   } // x would be freed here
-  // *y would point to unallocated memory here
+  let z: int = *x // ERROR *y would point to unallocated memory
 }
-\end{verbatim}
-The second invariant is to prevent any memory from being simultaneously aliased and mutable.
-This is to avoid situtations like the following:
-\begin{verbatim}
+
 {
   let x: Option<int> = Some(3);
   let y: &int = match x {
     Some(ref z) => z,
     None => fail!(), // Impossible
   }
-  // If x is mutable, then the payload 3 is both aliased and mutable
-  x = None // The payload is now uninitialized so *y is a dangling pointer
+  x = None // payload is now uninitialized
+  let z: int = *y; // ERROR! *y points to uninitialized memory
 }
 \end{verbatim}
-Therefore immutable borrows freeze the underlying data.
-It cannot be mutated by anything while the borrow exists.
-However, it is freely copyable.
-\begin{verbatim}
-{
-  let x: int = 3;
-  let y: &int = &x;
-  let z: &int = y; // Both y and z are readable
-  x = 2; // ERROR! x is frozen by y
-}
-\end{verbatim}
-Conversely, mutable borrows forbid all other access to the underlying data.
-It does allow the data to be mutated, but it is an affine datatype like unique pointers.
-\begin{verbatim}
-{
-  let x: int = 3;
-  let y: &mut int = &mut x;
-  //let z: int = x; // ERROR! cannot use x while mutable borrowed
-  let z: int = *y; // OK
 
-  let w: &mut int = y; // Moves y into w. y is not uninitialized
-  z = *y; // ERROR! y is uninitialized
+Aliased, mutable memory can be avoided in two ways: forbidding mutability or forbidding aliasing.
+Correspondingly, Rust has two kinds of borrowed references.
+Immutable borrows, denoted \texttt{\&}, are aliasable,
+but require all memory reachable through them to be immutable for the duration of the borrow.
+\begin{verbatim}
+{
+  let x: ~int = ~1;
+  let y: &~int = &x; // this immutable borrow prevents x from being changed
+  let z: ~int = x; // Rust will not let this typecheck because it would change x 
 }
 \end{verbatim}
-As with unique pointers, these checks are all static.
+
+Conversely, mutable borrows, denoted \texttt{\&mut}, are mutable,
+but require all memory reachable through them to be \emph{only} accessible through the borrow
+for the duration. That is, they guarantee unique access.
+\begin{verbatim}
+{
+  let x: ~int = ~1;
+  let y: &mut ~int = &mut x; // this mutable borrow prevents others from using x
+  let z: ~int = x; // Rust will not let this typecheck because it would access x
+}
+\end{verbatim}
+
+Finally, both kinds of borrowed reference require that the referent outlive the reference,
+which prevents dangling references.
+\begin{verbatim}
+fn foo() -> &int {
+  let x: int = 1;
+  return &x; // Rust will not let this typecheck because it would be a dangling pointer
+}
+\end{verbatim}
+
+
+%\subsection*{Borrowed References}
+%Borrowed references are a means to provide safe, temporary aliases in Rust.
+%They do so by enforcing two invariants.
+%The first is that references are always valid.
+%\begin{verbatim}
+%{
+%  let x: int; // An uninitialized stack integer
+%  let y: &int = &x; // ERROR! *y would point to uninitialized memory
+%}
+%\end{verbatim}
+%This also extends to cases where the referent falls out of scope too soon.
+%\begin{verbatim}
+%{
+%  let y: &int;
+%  {
+%    let x: int = 3;
+%    y = &x; // ERROR! x does not live long enough
+%  } // x would be freed here
+%  // *y would point to unallocated memory here
+%}
+%\end{verbatim}
+%The second invariant is to prevent any memory from being simultaneously aliased and mutable.
+%This is to avoid situtations like the following:
+%\begin{verbatim}
+%{
+%  let x: Option<int> = Some(3);
+%  let y: &int = match x {
+%    Some(ref z) => z,
+%    None => fail!(), // Impossible
+%  }
+%  // If x is mutable, then the payload 3 is both aliased and mutable
+%  x = None // The payload is now uninitialized so *y is a dangling pointer
+%}
+%\end{verbatim}
+%Therefore immutable borrows freeze the underlying data.
+%It cannot be mutated by anything while the borrow exists.
+%However, it is freely copyable.
+%\begin{verbatim}
+%{
+%  let x: int = 3;
+%  let y: &int = &x;
+%  let z: &int = y; // Both y and z are readable
+%  x = 2; // ERROR! x is frozen by y
+%}
+%\end{verbatim}
+%Conversely, mutable borrows forbid all other access to the underlying data.
+%It does allow the data to be mutated, but it is an affine datatype like unique pointers.
+%\begin{verbatim}
+%{
+%  let x: int = 3;
+%  let y: &mut int = &mut x;
+%  //let z: int = x; // ERROR! cannot use x while mutable borrowed
+%  let z: int = *y; // OK
+%
+%  let w: &mut int = y; // Moves y into w. y is not uninitialized
+%  z = *y; // ERROR! y is uninitialized
+%}
+%\end{verbatim}
+%As with unique pointers, these checks are all static.
 
 \section*{Types}
 Values in Patina can be described by the following types:
