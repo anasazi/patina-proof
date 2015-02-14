@@ -4,6 +4,7 @@
 \usepackage{amsmath}
 \usepackage{amsthm}
 \usepackage{amsfonts}
+\usepackage{mathrsfs}
 
 % domain shorthand
 \DeclareMathOperator{\dom}{dom}
@@ -27,6 +28,7 @@
 
 % lifetime shorthand
 \newcommand \lt {\ell}
+\newcommand \ltr {\mathscr{L}}
 
 % Greek shorthands
 \newcommand \ga {\alpha}
@@ -71,8 +73,11 @@
 \newcommand \ev[3] {{#1} \vdash {#2} \to {#3}}
 \newcommand \shallow[3] {\textsc{shallow}({#1},{#2},{#3})}
 \newcommand \initShadow[1] {\textsc{init}({#1})}
+\newcommand \bankwf[3] {{#1} \vdash {#2} \leq {#3}}
 
 \input{./intro.tex}
 \input{./paths.tex}
+\input{./exprs.tex}
+\input{./stmts.tex}
 
 \end{document}

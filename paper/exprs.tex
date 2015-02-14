@@ -1,0 +1,161 @@
+\section*{R-Values}
+
+R-values in Patina are expressions that can evaluate to a layout.
+Effectively, they are all the ways to construct values that can be deconstructed by L-values.
+This layer of Patina involves the borrow checker, which ensures the borrowed reference guarantees.
+In order to focus on the details of the borrow checker, we will pare down our types.
+Variants, tuples, and recursive types have straightforward behavior here 
+and would unnecessarily clutter the discussion.
+Going forward, we will use this subset of our earlier language:
+
+\[
+\begin{array}{lccl}
+\textrm{Context}  & \gG & : & \textrm{Variable} \rightarrow \textrm{Type} \\
+\textrm{Shadow Heap} & \gU & : & \textrm{Variable} \rightarrow \textrm{Shadow} \\
+\textrm{Map} & V   & : & \textrm{Variable} \rightarrow \textrm{Allocation} \\
+\textrm{Heap Type} & \gS & : & \textrm{Allocation} \rightarrow \textrm{Type} \\
+\textrm{Heap} & H   & : & \textrm{Allocation} \rightarrow \textrm{Layout} \\
+& & & \\
+\textrm{Lifetime} & \lt & & \\
+\textrm{Variable} & x & & \\
+\textrm{Integer} & z & & \\
+\textrm{Allocation} & \ga & & \\
+& & & \\
+\textrm{Qualifier} & q & \bnfdef & \qimm \bnfalt \qmut \\
+\textrm{Type} & \gt & \bnfdef & \tyint \bnfalt \own{\gt} \bnfalt \tyref{\lt}{q}{\gt} \\
+\textrm{Path} & p & \bnfdef & \base \bnfalt \deref{p} \\
+\textrm{Cell} & c & \bnfdef & \void \bnfalt z \bnfalt \own{\ga} \bnfalt \refval{q}{\ga} \\
+\textrm{Layout} & l & \bnfdef & c \\
+\textrm{Hole} & h & \bnfdef & \uninit \bnfalt \tyint \bnfalt \own{\gs} \bnfalt \refval{q}{\gt} \\
+\textrm{Shadow} & \gs & \bnfdef & h \\
+\end{array}
+\]
+
+Routes would only consist of $\base$, so they are now elided.
+Without variants, the $\gY$ context is irrelevant, so it is elided as well.
+
+We define three kinds of expressions: integer constants, using the value at a L-value, 
+and creating a borrowed reference to the value at a L-value.
+
+\[
+\begin{array}{lccl}
+\textrm{Expression} & e & \bnfdef & z \bnfalt \lv{x}{p} \bnfalt \tyref{\lt}{q}{\lv{x}{p}}
+\end{array}
+\]
+
+\subsection*{Tracking Loans}
+
+When we use a L-value in an expression, we must ensure the operation we are performing on it
+does not violate the promises of existing loans, and we must ensure that the value it refers
+to is fully initialized. When we create a borrowed reference, we must ensure that the
+promises of the borrow can actually be upheld for the duration of the borrow.
+In order to make these checks, we need to know what is borrowed, how it is borrowed, and for
+how long it is borrowed. We will accomplish this by adding a stack of loans to every
+level of the shadow heap:
+
+\[
+\begin{array}{lccl}
+\textrm{Hole} & h & \bnfdef & \uninit \bnfalt \tyint \bnfalt \own{\gs} \bnfalt \refval{q}{\gs} \\
+\textrm{Bank} & \$ & \bnfdef & \emptyset \bnfalt \$, (\lt,q) \\
+\textrm{Shadow} & \gs & \bnfdef & \$:h \\
+\end{array}
+\]
+
+Each pair $(\lt, q)$ describes the duration and manner of a loan, 
+with more recent loans at the front of the stack.
+Since every path can be borrowed, every path must have a loan stack (or bank) associated with it.
+The easiest way to do that is to tag every shadow with a bank.
+Note that the borrowed reference hole has changed.
+When we only cared about initialization, we used the hole $\refval{q}{\gt}$.
+Since everything reachable via the borrow was initialized, we did not need to record
+the initialization state.
+Now, however, we do need to record the loan state of things reachable via the borrow.
+Thus, we make the reference hole recursive: $\refval{q}{\gs}$.
+
+\subsection*{Shadow Typing with Banks}
+Since our shadows now include loan information, we need to modify our shadow typing.
+While we have include lifetimes in our model from the beginning, this is the first time
+we will actually utilize them. Before we can discuss how to check banks, we must first
+discuss what lifetimes are, where they come from, and what they give us.
+
+\subsubsection*{The Lifetime Relation}
+Lifetimes, as the name implies, encompass a notion of duration.
+Specifically, they describe the duration a value is allocated and 
+the duration of a loan. Each new block of scope defines a new lifetime.
+So there is a clear ordering on lifetimes, $\lt \leq \lt'$ if the duration of $\lt$
+is not longer than the duration of $\lt'$. More formally:
+
+$$ \ltr \subseteq \textrm{Lifetime} \times \textrm{Lifetime} $$
+
+$$ \infer{\ltr \ \textrm{is a poset}}{\vdash \ltr} $$
+
+where $(\lt, \lt') \in \ltr$ means $\lt \leq \lt'$. Rust allows some other sources of lifetimes
+not relevant to the current model: lifetime parameters for functions and \emph{static}, which
+is the oldest lifetime and typically used for string constants. Though the lifetimes in our
+model form a total order, the general Rust lifetime relation is only a partial order.
+Since we intend this model to be a potential basis for all of Rust, we will ignore the
+totality of our lifetimes.
+
+\subsubsection*{Bank Coherence}
+As mentioned before, lifetimes come from scope blocks.
+This means that every variable has a lifetime, which comes from the block it was defined in.
+Since variables are deallocated at the end of the block in which they are defined,
+that lifetime is a accurate model. We record the lifetimes of variables in a new context:
+
+$$ L : \textrm{Variable} \rightarrow \textrm{Lifetime} $$
+
+Furthermore, if variables only exist for a particular lifetime, then it makes sense that
+loans of memory owned by the variable cannot be longer than the lifetime of the variable.
+Otherwise the deallocation of the variable could create dangling pointers elsewhere.
+
+Finally, we must ensure that more recent loans are not inconsistent with older loans
+of the same path. If a path is already loaned out for some lifetime $\lt$ and
+we loan it out again for some lifetime $\lt'$, then $(\lt', \lt) \in \ltr$.
+A loan only controls a value during the loan's lifetime, so it cannot make promises
+for lifetimes longer than that. Additionally, given a mutable loan we can reloan it immutably,
+but not the other way. A mutable loan knows it has unique access to a value, so it can
+guarantee the value can be immutable if it wishes. On the other hand, an immutable loan
+promises that the value will not be changed for its duration, which violates the requirement
+that a mutable loan should be able to mutate its referent. We characterize this relationship
+with an ordering on qualifiers: $\qimm < \qmut$.
+\newline
+
+\fbox{$\bankwf{\ltr}{\$}{\lt}$}
+
+\begin{mathpar}
+\infer[BWF-NONE]{ }{\bankwf{\ltr}{\emptyset}{\lt}} \and
+\infer[BWF-ONE]{(\lt', \lt) \in \ltr}{\bankwf{\ltr}{\emptyset , (\lt', q)}{\lt}} \and
+\infer[BWF-TWO]
+  {(\lt_2, \lt_1) \in \ltr \\ q_2 \leq q_1 \\ \bankwf{\ltr}{\$, (\lt_1, q_1)}{\lt}}
+  {\bankwf{\ltr}{\$,(\lt_1, q_1), (\lt_2, q_2)}{\lt}} \and
+\end{mathpar}
+
+\subsubsection*{Bounded Shadow Typing}
+%Similarly, the lifetimes of borrowed references reachable from the variable should 
+%not be shorter than the lifetime of the variable. Otherwise those references could become
+%dangling pointers.
+\subsubsection*{Shadow Heap Well-Formedness}
+
+%controlling loans, lifetime relation, variable lifetimes, etc
+
+\subsection*{Ensuring Operations Do Not Violate Loans}
+\subsubsection*{Reading}
+\subsubsection*{Writing}
+\subsubsection*{Moving}
+
+\subsection*{Using a L-value}
+
+\subsection*{Ensuring Loan Promises Can Be Upheld}
+\subsubsection*{Validity}
+\subsubsection*{Freezability}
+\subsubsection*{Uniqueness}
+
+\subsection*{Expression Typing}
+
+\subsection*{Using a Layout}
+
+\subsection*{Expression Evaluation}
+
+\subsection*{Expression Preservation}
+
+\subsection*{Expression Progress}
