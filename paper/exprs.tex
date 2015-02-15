@@ -188,13 +188,32 @@ loans.
   \infer[HT-UNREF]{(\lt,\lt')\in\ltr}{\tcb{\ltr}{\uninit}{\tyref{\lt'}{q}{\gt}}{mq}{\lt}} \and
   \infer[HT-INT]{ }{\tcb{\ltr}{\tyint}{\tyint}{mq}{\lt}} \and
   \infer[HT-OWN]{\tcb{\ltr}{\gs}{\gt}{mq}{\lt}}{\tcb{\ltr}{\own{\gs}}{\own{\gt}}{mq}{\lt}} \and
-  \infer[HT-REF]
+  %\infer[HT-REF]
+    %{(\lt, \lt') \in \ltr \\ \tcb{\ltr}{\gs}{\gt}{mq}{\lt} \\ \gs\ \textrm{init}}
+    %{\tcb{\ltr}{\refval{q}{\gs}}{\tyref{\lt'}{q}{\gt}}{mq}{\lt}}
+
+  \and
+  \infer[HT-REFMUT]
     {(\lt, \lt') \in \ltr \\ \tcb{\ltr}{\gs}{\gt}{mq}{\lt} \\ \gs\ \textrm{init}}
-    {\tcb{\ltr}{\refval{q}{\gs}}{\tyref{\lt'}{q}{\gt}}{mq}{\lt}}
+    {\tcb{\ltr}{\refval{\qmut}{\gs}}{\tyref{\lt'}{\qmut}{\gt}}{mq}{\lt}}
+  \and
+  \infer[HT-REFIMM]
+    {(\lt, \lt') \in \ltr \\ \tcb{\ltr}{\gs}{\gt}{\qimm}{\lt} \\ \gs\ \textrm{init}}
+    {\tcb{\ltr}{\refval{\qimm}{\gs}}{\tyref{\lt'}{\qimm}{\gt}}{mq}{\lt}}
+
+
 \end{mathpar}
 
 where $\gs\ \textrm{init}$ is a judgment that ensures a shadow is fully initialized,
-i.e. it cannot reach a $\uninit$.
+i.e.\ it cannot reach a $\uninit$.
+Note that the interior of immutable borrowed references is always controlled
+by an immutable loan. This prevents mutable loans of the interior of immutable borrows,
+which are nonsensical.
+
+%need to think about how the qualifier of a borrowed reference impacts the kind of controlling loan of its contents. Ex: a mutable loan of the dereference of an immutable borrow should be forbidden. Dereferences of mutable borrows can be loaned either way...
+%Perhaps the interior of an immutable borrow should be controlled by $\qimm$ always,
+%and the interior of a mutable borrow should be controlled by the incoming controller.
+%That seems sensible since immutable loans overpower mutable loans ... it's a similar pattern.
 
 \subsubsection*{Bounded Shadow Heap Well-Formedness}
 With our shadow typing updated to check banks,
@@ -216,9 +235,114 @@ that every lifetime in its range to be in the lifetime relation.
 \end{mathpar}
 
 \subsection*{Ensuring Operations Do Not Violate Loans}
+The most important duty of the borrow checker is making sure that
+performing some operation does not violate the promises of existing loans.
+We cannot read a path that has promised unique access to another.
+We cannot write to a path that has promised to remain unchanged or that we cannot read.
+We cannot move from a path that we do not own or that we cannot write.
+
+Additionally, we can only use a path that is fully initialized, or our program might
+try to touch a uninitialized value and get stuck.
+This means that $\shallow{\gU}{\lv{x}{p}}{\gs}$ holds and that $\gs\ \textrm{init}$ holds. 
+That is, enough memory is initialized to evaluate the L-value to a memory location,
+and everything reachable from that location is initialized.
+We use these dual judgments as a base to define our validity 
+checks for reading, writing, and moving.
+Reading will be more restricted than simple full initialization.
+Writing will be more restricted than reading.
+Moving will be more restricted than writing.
+
 \subsubsection*{Reading}
+The restriction we add to full initialization to verify that reading a path is valid is
+that no part of the path or anything reachable from the path has been mutable loaned.
+A mutable loan promises unique access via the corresponding mutable borrowed reference, 
+which precludes reading the loaned path directly.
+We can also short-circuit our check in a two cases.
+If the path we want to read dereferences an immutable borrow, then we do not need
+to check the interior of the borrow. By its nature, the immutable borrow guarantees readability,
+and any mutable loaning of the interior is already forbidden.
+For similar reasons, when checking the memory reachable from the path 
+we do not need to examine the interior of immutable borrows.
+\newline
+
+\fbox{$\cnml{\gs}$}
+
+\begin{mathpar}
+  \infer[CNML-INT]{\nm{\$}}{\cnml{\$:\tyint}} \and
+  \infer[CNML-OWN]{\nm{\$} \\ \cnml{\gs}}{\cnml{\$:\own{\gs}}} \and
+  \infer[CNML-REFIMM]{\nm{\$}}{\cnml{\$:\refval{\qimm}{\gs}}} \and
+  \infer[CNML-REFMUT]{\nm{\$} \\ \cnml{\gs}}{\cnml{\$:\refval{\qmut}{\gs}}}
+\end{mathpar}
+
+\fbox{$\canread{p}{\gs}$}
+
+\begin{mathpar}
+  \infer[CR-BASE] {\cnml{\gs}} {\canread{\base}{\gs}} \and
+  \infer[CR-DEOWN]
+    {\nm{\$} \\ \canread{p}{\gs} }
+    {\canread{\deref{p}}{\$:\own{\gs}}} \and
+  \infer[CR-DEREFIMM]
+    {\nm{\$}}
+    {\canread{\deref{p}}{\$:\refval{\qimm}{\gs}}} \and
+  \infer[CR-DEREFMUT]
+    {\nm{\$} \\ \canread{p}{\gs}}
+    {\canread{\deref{p}}{\$:\refval{\qmut}{\gs}}}
+\end{mathpar}
+
+where one would check that $\lv{x}{p}$ is readable by $\canread{p}{\gU(x)}$.
+
 \subsubsection*{Writing}
+In order to safely write a path, no part of the path or anything reachable from the path
+can be loaned at all. An immutable loan implies the data is frozen, 
+which prevents us from writing. A mutable loan implies something else has unique acces
+to the data, which also prevents us from writing.
+Additionally, we cannot write to the interior of an immutable borrow, even if we can
+write to the borrowed reference itself. Memory reachable from that immutable borrow
+is frozen.
+\newline
+
+\fbox{$\cnl{\gs}$}
+
+\begin{mathpar}
+  \infer[CNL-INT]{ }{\cnl{\emptyset : \tyint}} \and
+  \infer[CNL-OWN]{\cnl{\gs}}{\cnl{\emptyset : \own{\gs}}} \and
+  \infer[CNL-REF]{\cnl{\gs}}{\cnl{\emptyset : \refval{q}{\gs}}}
+\end{mathpar}
+
+Note that the borrowed reference cases of have merged again after being separate for reading.
+We cannot guarantee that the interior of an immutable borrow will not be loaned out without
+actually checking. However, note that $\cnl{\gs}$ implies $\cnml{\gs}$.
+\newline
+
+\fbox{$\cw{p}{\gs}$}
+
+\begin{mathpar}
+  \infer[CW-BASE]{\cnl{\gs}}{\cw{\base}{\gs}} \and
+  \infer[CW-DEOWN]{\cw{p}{\gs}}{\cw{\deref{p}}{\emptyset : \own{\gs}}} \and
+  \infer[CW-DEREFMUT]{\cw{p}{\gs}}{\cw{\deref{p}}{\emptyset : \refval{\qmut}{\gs}}}
+\end{mathpar}
+
+Again, note that $\cw{p}{\gs}$ implies $\canread{p}{\gs}$.
+Rust requires that the ability to write implies the ability to read, which is
+reflected in our judgments.
+
 \subsubsection*{Moving}
+The final operation, moving out of a path, requires ownership over the path.
+Moving is used when the value being read has an affine type, which prevents it 
+from being merely copied. The old location of the value must be purged.
+This requires the ability to write, but since it leaves the original path uninitialized
+it cannot be used via mutable borrows. Doing so would violate the guarantee that borrowed
+references always point to initialized memory.
+\newline
+
+\fbox{$\cm{p}{\gs}$}
+
+\begin{mathpar}
+  \infer[CM-BASE]{\cnl{\gs}}{\cm{\base}{\gs}} \and
+  \infer[CM-DEOWN]{\cm{p}{\gs}}{\cm{\deref{p}}{\emptyset : \own{\gs}}}
+\end{mathpar}
+
+Note that $\cm{p}{\gs}$ implies $\cw{p}{\gs}$.
 
 \subsection*{Using a L-value}
 

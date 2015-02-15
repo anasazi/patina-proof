@@ -78,6 +78,11 @@
 \newcommand \tcb[5] {{#1} \vdash {#2} : {#3}\ \textrm{controlled by}\ {#4} \leq {#5}}
 \newcommand \tb[4] {{#1} \vdash {#2} : {#3} \leq {#4}}
 \newcommand \nm[1] {\textsc{not-mut}({#1})}
+\newcommand \canread[2] {\textsc{can-read}({#1},{#2})}
+\newcommand \cnml[1] {\textsc{contains-no-mut-loans}({#1})}
+\newcommand \cw[2] {\textsc{can-write}({#1},{#2})}
+\newcommand \cnl[1] {\textsc{contains-no-loans}({#1})}
+\newcommand \cm[2] {\textsc{can-move}({#1},{#2})}
 
 \input{./intro.tex}
 \input{./paths.tex}
