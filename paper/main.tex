@@ -42,6 +42,7 @@
 % qual shorthand
 \newcommand \qimm {\mathsf{imm}}
 \newcommand \qmut {\mathsf{mut}}
+\newcommand \mqnone {\mathsf{none}}
 
 % type shorthand
 \newcommand \tyint {\mathsf{int}}
@@ -74,6 +75,9 @@
 \newcommand \shallow[3] {\textsc{shallow}({#1},{#2},{#3})}
 \newcommand \initShadow[1] {\textsc{init}({#1})}
 \newcommand \bankwf[3] {{#1} \vdash {#2} \leq {#3}}
+\newcommand \tcb[5] {{#1} \vdash {#2} : {#3}\ \textrm{controlled by}\ {#4} \leq {#5}}
+\newcommand \tb[4] {{#1} \vdash {#2} : {#3} \leq {#4}}
+\newcommand \nm[1] {\textsc{not-mut}({#1})}
 
 \input{./intro.tex}
 \input{./paths.tex}

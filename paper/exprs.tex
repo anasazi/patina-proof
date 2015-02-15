@@ -131,12 +131,89 @@ with an ordering on qualifiers: $\qimm < \qmut$.
 \end{mathpar}
 
 \subsubsection*{Bounded Shadow Typing}
-%Similarly, the lifetimes of borrowed references reachable from the variable should 
-%not be shorter than the lifetime of the variable. Otherwise those references could become
-%dangling pointers.
-\subsubsection*{Shadow Heap Well-Formedness}
+We need to update our shadow typing judgment to support checking bank coherence,
+but we need to check two new things as well. First, we will require that
+variables can only reference memory that they will not outlast. This means
+we require borrowed references to have lifetimes not shorter than the bounding lifetime,
+which is the reverse of the requirement on loans. This should make sense, we can only use
+memory that will exist at least as long as us, but we can only loan out our memory
+to others that will not last longer than us.
 
-%controlling loans, lifetime relation, variable lifetimes, etc
+Second, we need to make sure that more specific loans do not contradict more general loans.
+For example, if a variable $x$ is loaned immutably, then a mutable loan of $\deref{x}$
+would not make sense. The immutable loan of $x$ promises that no memory reachable via $x$
+will change, but the mutable loan of $\deref{x}$ promises that the memory reachable 
+via $\deref{x}$ can be changed through the borrowed reference. Similarly, if $x$ was loaned
+mutably, then $\deref{x}$ could not be loaned at all. The loan of $x$ promises that only
+the borrowed reference has access to memory reachable from $x$, but the loan of $\deref{x}$
+creates an alias to part of that memory. In general, a wider immutable loan requires more
+specific loans to not be mutable loans, and a wider mutable loan prevents any more specific
+loans.
+
+\[
+\begin{array}{lccl}
+\textrm{Maybe Qualifier} & mq & \bnfdef & \mqnone \bnfalt q
+\end{array}
+\]
+
+\fbox{$\nm{\$}$}
+
+\begin{mathpar}
+  \infer[NM-EMPTY]{ }{\nm{\emptyset}} \and
+  \infer[NM-IMM]{ }{\nm{\$, (\lt, \qimm)}}
+\end{mathpar}
+
+\fbox{$\tcb{\ltr}{\gs}{\gt}{mq}{\lt}$}
+
+\begin{mathpar}
+  \infer[ST-NONE]
+    {\bankwf{\ltr}{\emptyset}{\lt} \\ \tcb{\ltr}{h}{\gt}{\mqnone}{\lt}}
+    {\tcb{\ltr}{(\emptyset : h)}{\gt}{\mqnone}{\lt}} \and
+  \infer[ST-SOME]
+    {\bankwf{\ltr}{\$,(\lt',q)}{\lt} \\ \tcb{\ltr}{h}{\gt}{q}{\lt}}
+    {\tcb{\ltr}{(\$,(\lt',q) : h)}{\gt}{\mqnone}{\lt}} \and
+  \infer[ST-IMM]
+    {\bankwf{\ltr}{\$}{\lt} \\ \nm{\$} \\ \tcb{\ltr}{h}{\gt}{\qimm}{\lt}}
+    {\tcb{\ltr}{(\$ : h)}{\gt}{\qimm}{\lt}} \and
+  \infer[ST-MUT]
+    {\bankwf{\ltr}{\emptyset}{\lt} \\ \tcb{\ltr}{h}{\gt}{\qmut}{\lt}}
+    {\tcb{\ltr}{(\emptyset : h)}{\gt}{\qmut}{\lt}}
+\end{mathpar}
+
+\fbox{$\tcb{\ltr}{h}{\gt}{mq}{\lt}$}
+
+\begin{mathpar}
+  \infer[HT-UNINT]{ }{\tcb{\ltr}{\uninit}{\tyint}{mq}{\lt}} \and
+  \infer[HT-UNOWN]{ }{\tcb{\ltr}{\uninit}{\own{\gt}}{mq}{\lt}} \and
+  \infer[HT-UNREF]{(\lt,\lt')\in\ltr}{\tcb{\ltr}{\uninit}{\tyref{\lt'}{q}{\gt}}{mq}{\lt}} \and
+  \infer[HT-INT]{ }{\tcb{\ltr}{\tyint}{\tyint}{mq}{\lt}} \and
+  \infer[HT-OWN]{\tcb{\ltr}{\gs}{\gt}{mq}{\lt}}{\tcb{\ltr}{\own{\gs}}{\own{\gt}}{mq}{\lt}} \and
+  \infer[HT-REF]
+    {(\lt, \lt') \in \ltr \\ \tcb{\ltr}{\gs}{\gt}{mq}{\lt} \\ \gs\ \textrm{init}}
+    {\tcb{\ltr}{\refval{q}{\gs}}{\tyref{\lt'}{q}{\gt}}{mq}{\lt}}
+\end{mathpar}
+
+where $\gs\ \textrm{init}$ is a judgment that ensures a shadow is fully initialized,
+i.e. it cannot reach a $\uninit$.
+
+\subsubsection*{Bounded Shadow Heap Well-Formedness}
+With our shadow typing updated to check banks,
+we can update what we mean by a well-formed shadow heap.
+The lifetime relation and the lifetime map are now included.
+We ensure the lifetime map is well-formed by requiring its domain to be
+the same as the domain of the type context and the shadow heap, and by requiring
+that every lifetime in its range to be in the lifetime relation.
+
+\begin{mathpar}
+\mprset{flushleft}
+\infer{
+\dom \gG = \dom \gU = \dom L \\\\
+\forall x \in \dom \gG.~\gG(x)~\textrm{closed} \\\\
+\forall x \in \dom L.~(L(x),L(x)) \in L \\\\
+\forall x \in \dom \gU.~\tcb{\ltr}{\gU(x)}{\gG(x)}{\mqnone}{L(x)}
+}
+{\tb{\ltr}{\gU}{\gG}{L}}
+\end{mathpar}
 
 \subsection*{Ensuring Operations Do Not Violate Loans}
 \subsubsection*{Reading}
