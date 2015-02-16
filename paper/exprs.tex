@@ -527,7 +527,7 @@ We record the new loan in the output shadow heap.
      \freezable{\gG}{\ltr}{\lv{x}{p}}{\lt} \\
      \textsc{record}(\gU,\lv{x}{p},(\lt,\qimm),\gU')
     }
-    {\tc{\gG;\ltr;L;\gU}{\tyref{\lt}{\qimm}{\lv{x}{p}}}{\gt;\gU'}}
+    {\tc{\gG;\ltr;L;\gU}{\tyref{\lt}{\qimm}{\lv{x}{p}}}{\tyref{\lt}{\qimm}{\gt};\gU'}}
 \end{mathpar}
 
 Similarly, creating a mutable borrowed reference requires checking the mutable loan
@@ -542,7 +542,7 @@ we require uniqueness.
    \unique{\gG}{\ltr}{\lv{x}{p}}{\lt} \\
    \textsc{record}(\gU,\lv{x}{p},(\lt,\qmut),\gU')
   }
-  {\tc{\gG;\ltr;L;\gU}{\tyref{\lt}{\qmut}{\lv{x}{p}}}{\gt;\gU'}}
+  {\tc{\gG;\ltr;L;\gU}{\tyref{\lt}{\qmut}{\lv{x}{p}}}{\tyref{\lt}{\qmut}{\gt};\gU'}}
 \end{mathpar}
 
 \begin{conj}[Expression Shadow Preservation]
@@ -628,5 +628,58 @@ but not when considered together with the result layout.
 \end{mathpar}
 
 \subsection*{Expression Preservation}
+Having defined both evaluation and typing for expressions, we can finally
+state the preservation lemma for expressions. Assuming all input contexts are
+well-formed and given a well typed expression that evaluates to a layout,
+then that layout has the same type as the expression, the resulting shadow heap
+is well-formed, and the resulting heap is consistent with the resulting shadow heap.
+
+\begin{conj}[Expression Preservation]
+  If $\tc{}{H}{\gS}$, $\gG;V\vdash\gS$, $\vdash\ltr$, $\tb{\ltr}{\gU}{\gG}{L}$, 
+  $\tc{V}{H}{\gU}$, $\tc{\gG;\ltr;L;\gU}{e}{\gt;\gU'}$, and $\ev{V;H}{e}{l;H'}$
+  then $\tc{\gS}{l}{\gt}$, $\tc{}{H'}{\gS}$, $\tb{\ltr}{\gU'}{\gG}{L}$, and $\tc{V}{H'}{\gU'}$.
+\end{conj}
+
+\begin{proof}[Justification]
+  This is trivial in the integer case.
+  In the reference case, the heap does not change.
+  From Expression Shadow Preservation, we get the well-formedness of the new shadow heap,
+  which has been extended with one new loan. Since the intialization information in the shadow
+  heap has not changed, it should still model the heap correctly.
+  That the type of the layout matches the type of the expression is simple to establish.
+
+  In the use case, we again get the well-formedness of the new shadow heap from
+  Expression Shadow Preservation. The type of the layout we can get via 
+  Path Type Preservation and Read Safety. The write we perform on the heap
+  does not change the type of anything, so the new heap will still typecheck under the heap type.
+  In the new shadow heap, the used path was deinitialized (if affine).
+  In the new heap, the used path was voided (if affine).
+  The new heap should be consistent with the new shadow heap.
+\end{proof}
+
+\subsubsection*{The Layout Resulting from Evaluation is Fully Initialized}
+We should also note that the resulting layout is fully initialized.
+This is trivial in the integer case. In the reference and the use case
+we rely on typing judgments that asserted full initialization and the correspondence
+of the shadow heap with the runtime heap.
 
 \subsection*{Expression Progress}
+The progress lemma for expressions is surprisingly straightforward.
+Since we do not nest expressions, no induction is necessary.
+Each case constructs the resulting values in a straightforward manner.
+
+\begin{conj}[Expression Progress]
+  If $\tc{}{H}{\gS}$, $\gG;V\vdash\gS$, $\vdash\ltr$, $\tb{\ltr}{\gU}{\gG}{L}$,
+  $\tc{V}{H}{\gU}$, and $\tc{\gG;\ltr;L;\gU}{e}{\gt;\gU'}$
+  then there exists a layout $l$ and a heap $H'$ such that $\ev{V;H}{e}{l;H'}$.
+\end{conj}
+
+\begin{proof}[Justification]
+  In the integer case this is trivial.
+  In both reference cases, we can rely on Path Progress to evaluate the L-value
+  and use the address to construct the resulting layout, and the heap does not change.
+  In the use case, we can rely on Path Progress to evaluate the L-value to an address.
+  Then we can rely on Read Safety to find the layout. Since we could read sufficiently,
+  we can also write sufficiently so we find the heap.
+
+\end{proof}
