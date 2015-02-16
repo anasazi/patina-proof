@@ -1,6 +1,192 @@
 \section*{Statements}
+We have finally reached the outermost shell of Patina!
+The statements layer is primarily about heap manipulation and chaining expressions.
+It mostly just relies on judgments we have already defined.
+$\nop$ and $\seq{s}{s}$ are simply for chaining together statements.
+$\set{\lv{x}{p}}{e}$ is for initializing a path with the result of an expression.
+$\new{\lv{x}{p}}{\lv{x}{p}}$ is similar, but allocates the result on the heap 
+and initializes the path with a new unique pointer. 
+Treating this as a statement rather than an expression
+simplifies the expression preservation and progress lemmas.
+Note that both versions are for \emph{initialization} and not \emph{assignment}.
+We only allow initialization of droppable paths, which we guarantee will not orphan memory.
+$\swap{\lv{x}{p}}{\lv{x}{p}}$ will perform a shallow swap of two writable paths.
+This is the only way to actually mutate through a mutable borrow since we do not allow
+interior of a borrowed reference to be uninitialized even temporarily.
+$\free{\lv{x}{p}}$ performs a shallow free and is the inverse of \textsf{new}.
+$\push{\lt}{x}{\gt}{s}$ will create a new stack variable.
+$\pop{x}{s}$ will pop that stack variable once the statement that requires it finishes.
+It is for evaluation purposes and should not appear in user code.
+
+\[
+\begin{array}{lccl}
+\textrm{Statements} & s & \bnfdef & \nop \bnfalt \seq{s}{s} \bnfalt \set{\lv{x}{p}}{e}
+			  \bnfalt \new{\lv{x}{p}}{\lv{x}{p}} \bnfalt \swap{\lv{x}{p}}{\lv{x}{p}}
+			  \bnfalt \free{\lv{x}{p}} \bnfalt \push{\lt}{x}{\gt}{s}
+			  \bnfalt \pop{x}{s}
+\end{array}
+\]
+
+\subsection*{Droppable Shadows}
+Earlier we defined $\textsc{droppable}(l)$, which specified layouts that were safe to deallocate.
+Now we define an equivalent notion for shadows, which we will use to ensure only droppable
+layouts are deallocated. We also require a droppable shadow to be unborrowed, which will
+prevent us from creating dangling borrowed references.
+\newline
+
+\fbox{$\gs\ \textsc{droppable}$}
+
+\begin{mathpar}
+  \infer[DS-UNINIT]{ }{\emptyset : \uninit\ \textsc{droppable}} \and
+  \infer[DS-INT]{ }{\emptyset : \tyint\ \textsc{droppable}} \and
+  \infer[DS-REF]
+    {\cnl{\gs}}
+    {\emptyset : \refval{q}{\gs}\ \textsc{droppable}}
+\end{mathpar}
+
+\subsection*{Subtyping}
+The only subtyping in Patina is lifetime subtyping.
+Borrowed references are contravariant in their lifetimes.
+This means that a reference for a longer lifetime is a 
+subtype of a reference for a shorter lifetime, which is the behavior we want.
+The reference of a longer lifetime is usable anywhere the reference of a shorter lifetime is.
+Since mutable references can both read and write, they are invariant in their type argument.
+Immutable references can only read, so they are covariant in their type argument.
+\newline
+
+\fbox{$\ltr\vdash\gt_0<:\gt_1$}
+
+\begin{mathpar}
+  \infer[SUB-INT]{ }{\ltr\vdash\tyint<:\tyint} \and
+  \infer[SUB-OWN]{\ltr\vdash\gt_1<:\gt_2}{\ltr\vdash\ \own{\gt_1}<:\ \own{\gt_2}} \and
+  \infer[SUB-REFIMM]
+    {(\lt_2,\lt_1)\in\ltr \\ \ltr\vdash\gt_1<:\gt_2}
+    {\ltr\vdash\tyref{\lt_1}{\qimm}{\gt_1}<:\tyref{\lt_2}{\qimm}{\gt_2}} \and
+  \infer[SUB-REFMUT]
+    {(\lt_2,\lt_1)\in\ltr}
+    {\ltr\vdash\tyref{\lt_1}{\qmut}{\gt}<:\tyref{\lt_2}{\qmut}{\gt}}
+\end{mathpar}
+
+
 \subsection*{Statement Typing}
+\fbox{$\tc{\gG;\ltr;L;\gU}{s}{\gU'}$}
+\newline
+
+The $\nop$ statement does nothing so it is easy to check.
+
+\begin{mathpar}
+  \infer[ST-SKIP]{ }{\tc{\gG;\ltr;L;\gU}{\nop}{\gU}}
+\end{mathpar}
+
+Sequencing two statement simply sequences typechecking by threadings the shadow heap.
+Note that since $\gG$ is not changing, the statements can only change the initialization
+and loan information of the shadow heap.
+
+\begin{mathpar}
+  \infer[ST-SEQ]
+    {\tc{\gG;\ltr;L;\gU_0}{s_1}{\gU_1} \\ \tc{\gG;\ltr;L;\gU_1}{s_2}{\gU_2}}
+    {\tc{\gG;\ltr;L;\gU_0}{\seq{s_1}{s_2}}{\gU_2}}
+\end{mathpar}
+
+Swapping requires only that the two L-values have the same type and that they both
+be writable. Since the writability guarantees no part is loaned, the shadow heap is not changed.
+
+\begin{mathpar}
+  \infer[ST-SWAP]
+    {\tc{\gG}{\lv{x_1}{p_1}}{\gt} \\ \cw{p_1}{\gU(x_1)} \\\\
+     \tc{\gG}{\lv{x_2}{p_2}}{\gt} \\ \cw{p_2}{\gU(x_2)}}
+    {\tc{\gG;\ltr;L;\gU}{\swap{\lv{x_1}{p_1}}{\lv{x_2}{p_2}}}{\gU}}
+\end{mathpar}
+
+Initializing with a value requires that the path be droppable so that nothing will be orphaned.
+It also requires the expression type to be a subtype of the path type.
+As discussed above, this refers to lifetimes: the subtype lifetime is greater than or
+equal to the lifetime of the supertype. This requirement guarantees that the value
+stored at the path will be valid for at least as long as the path is valid.
+Finally, we initialize the path in the output shadow heap.
+
+\begin{mathpar}
+  \infer[ST-SET]
+    {\tc{\gG}{\lv{x}{p}}{\gt_p} \\
+     \tc{\gG;\ltr;L;\gU_0}{e}{\gt_e;\gU_1} \\
+     \ltr\vdash\gt_e<:\gt_p \\\\
+     \shallow{\gU_1}{\lv{x}{p}}{\gs} \\
+     \gs\ \textsc{droppable} \\
+     \textsc{init}(\gU_1,\lv{x}{p},\gU_2)
+    }
+    {\tc{\gG;\ltr;L;\gU_0}{\set{\lv{x}{p}}{e}}{\gU_2}}
+\end{mathpar}
+
+Initializing with a pointer is similar to initializing with a value.
+Except instead of expression typing, we must check that we can use the path 
+on the right hand side.
+
+\begin{mathpar}
+  \infer[ST-NEW]
+    {\tc{\gG}{\lv{x_l}{p_l}}{\own{\gt_l}} \\
+     \uselv{\gG}{\gU_0}{\lv{x_r}{p_r}}{\own{\gt_r}}{\gU_1} \\
+     \ltr\vdash\ \own{\gt_r}<:\ \own{\gt_l} \\\\
+     \shallow{\gU_1}{\lv{x_l}{p_l}}{\gs} \\
+     \gs\ \textsc{droppable} \\
+     \textsc{init}(\gU_1,\lv{x_l}{p_l},\gU_2)
+    }
+    {\tc{\gG;\ltr;L;\gU_0}{\new{\lv{x_l}{p_l}}{\lv{x_r}{p_r}}}{\gU_2}}
+\end{mathpar}
+
+Freeing the memory of a unique pointer requires checking that that memory is droppable.
+We then mark it used in the output shadow heap, which since this a unique pointer
+will replace the shadow with $\uninit$.
+
+\begin{mathpar}
+  \infer[ST-FREE]
+  {\tc{\gG}{\lv{x}{p}}{\own{\gt}} \\
+   \shallow{\gU}{\lv{x}{p}}{\own{\gs}} \\
+   \gs\ \textsc{droppable} \\
+   \textsc{use}(\gU,\lv{x}{p},\gU')
+  }
+  {\tc{\gG;\ltr;L;\gU}{\free{\lv{x}{p}}}{\gU'}}
+\end{mathpar}
+
+Pushing a new stack variable involves checking that the body is well typed
+under the appropriately extended contexts. Newly pushed variables start uninitialized.
+By the end of the body, the variable must be droppable so that popping it will not
+orphan memory. When checking the body, we extend the lifetime relation with the new lifetime
+by adding the new lifetime as the smallest lifetime in the relation (it is related to everything
+else). Afterwards, we must filter everything involving this lifetime from the shadow heap.
+This should only consist of removing loans from banks. We also "deallocate" the stack variable
+from the shadow heap by restricting the domain to the domain of the input.
+
+\begin{mathpar}
+  \infer[ST-PUSH]
+  {\textsc{new-smallest-lifetime}(\ltr,\lt,\ltr') \\\\
+   \tc{\gG,x\mapsto\gt;\ltr';L,x\mapsto\lt;\gU_0,x\mapsto\uninit}{s}{\gU_1} \\\\
+   \gU_1(x)\ \textsc{droppable} \\
+   \textsc{filter}(\gU_1,\lt,\gU_2)
+  }
+  {\tc{\gG;\ltr;L;\gU_0}{\push{\lt}{x}{\gt}{s}}{\gU_2|_{\dom \gU_0}}}
+\end{mathpar}
+
+Popping a stack variable is similar, but we do not need to worry about extending contexts.
+Instead, we must make sure to remove the stack variable when we restrict the domain
+of the output shadow heap.
+
+\begin{mathpar}
+  \infer[ST-POP]
+  {\tc{\gG;\ltr;L;\gU_0}{s}{\gU_1} \\\\
+   \gU_1(x)\ \textsc{droppable} \\
+   \textsc{filter}(\gU_1,\lt,\gU_2)
+  }
+  {\tc{\gG;\ltr;L;\gU_0}{\pop{x}{s}}{\gU_2|_{\dom \gU_0 - \{x\}}}}
+\end{mathpar}
+
+One interesting thing to note here is that the domain of the input and output shadow heaps
+is always the same except for the \textsf{pop} case, where it decreases by one.
+Since \textsf{pop} does not appear in user code, this means that if a program starts
+with no memory allocated and that program type checks, then the program frees all the
+memory it allocates. Assuming of course that evaluation preserves the shadow heap.
+
 \subsection*{Statement Evaluation}
+
 \subsection*{Statement Preservation}
 \subsection*{Statement Progress}
 \section*{Patina Soundness}

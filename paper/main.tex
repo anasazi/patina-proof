@@ -68,6 +68,16 @@
 % hole shorthand
 \newcommand \uninit {\mathsf{uninit}}
 
+% statement shorthand
+\newcommand \nop {\mathsf{skip}}
+\newcommand \seq[2] {{#1};{#2}}
+\newcommand \set[2] {{#1} \leftarrow {#2}}
+\newcommand \new[2] {{#1} \leftarrow \textsf{new}\ {#2}}
+\newcommand \swap[2] {{#1} \leftrightarrow {#2}}
+\newcommand \free[1] {\textsf{free}\ {#1}}
+\newcommand \push[4] {\textsf{push}\ {#1}\ {#2}\ {#3}\ {#4}}
+\newcommand \pop[2] {\textsf{pop}\ {#1}\ {#2}}
+
 % judgment shorthand
 \newcommand \tc[3] {{#1} \vdash {#2} : {#3}}
 \newcommand \sub[3] {[{#1} \mapsto {#2}] {#3}}
