@@ -186,6 +186,60 @@ with no memory allocated and that program type checks, then the program frees al
 memory it allocates. Assuming of course that evaluation preserves the shadow heap.
 
 \subsection*{Statement Evaluation}
+Statement evaluation goes as you would expect.
+We use a new helper judgment $\textsc{fresh}(\ga)$ that generates a unused allocation.
+As before, we utilize domain restriction to "deallocate".
+Other than that, we simply use path and expression evaluation combined
+with \textsc{read} and \textsc{write}.
+\newline
+
+\fbox{$\sev{V}{H}{s}{V'}{H'}{s'}$}
+
+\begin{mathpar}
+  \infer[SE-SKIPSEQ]{ }{\sev{V}{H}{\seq{\nop}{s}}{V}{H}{s}} \and
+  \infer[SE-STEPSEQ]
+    {\sev{V}{H}{s_1}{V'}{H'}{s'_1}}
+    {\sev{V}{H}{\seq{s_1}{s_2}}{V'}{H'}{\seq{s'_1}{s_2}}} \and
+  \infer[SE-SET]
+    {\ev{V;H_0}{e}{l;H_1} \\
+     \ev{V;H_1}{\lv{x}{p}}{\ga} \\
+     \textsc{write}(H_1,\ga,l,H_2)
+    }
+    {\sev{V}{H_0}{\set{\lv{x}{p}}{e}}{V}{H_2}{\nop}} \and
+  \infer[SE-NEW]
+    {\ev{V;H_0}{\lv{x_r}{p_r}}{\ga_r} \\
+     \Read{H_0}{\ga_r}{l_r} \\
+     \textsc{write}(H_0,\ga_r,\textsc{use}(l_r),H_1) \\\\
+     \ev{V;H_1}{\lv{x_l}{p_l}}{\ga_l} \\
+     \textsc{fresh}(\ga_n) \\
+     \textsc{write}(H_1,\ga_l,\own{\ga_n},H_2) \\
+    }
+    {\sev{V}{H_0}{\new{\lv{x_l}{p_l}}{\lv{x_r}{p_r}}}{V}{H_2, \ga_n\mapsto l_r}{\nop}} \and
+  \infer[SE-SWAP]
+    {\ev{V;H_0}{\lv{x_l}{p_l}}{\ga_l} \\
+     \ev{V;H_0}{\lv{x_r}{p_r}}{\ga_r} \\\\
+     \Read{H_0}{\ga_l}{l_l} \\
+     \Read{H_0}{\ga_r}{l_r} \\\\
+     \textsc{write}(H_0,\ga_l,l_r,H_1) \\
+     \textsc{write}(H_1,\ga_r,l_l,H_2)
+    }
+    {\sev{V}{H_0}{\swap{\lv{x_l}{p_l}}{\lv{x_r}{p_r}}}{V}{H_2}{\nop}} \and
+  \infer[SE-FREE]
+    {\ev{V;H_0}{\lv{x}{p}}{\ga} \\
+     \Read{H_0}{\ga}{\own{\ga'}} \\
+     \textsc{write}(H_0,\ga,\textsc{use}(\own{\ga'}),H_1)
+    }
+    {\sev{V}{H_0}{\free{\lv{x}{p}}}{V}{H_1|_{\dom H_1 - \{\ga'\}}}{\nop}} \and
+  \infer[SE-PUSH]
+    {\textsc{fresh}(\ga)}
+    {\sev{V}{H}{\push{\lt}{x}{\gt}{s}}{V,x\mapsto\ga}{H,\ga\mapsto\void}{\pop{x}{s}}} \and
+  \infer[SE-POPSTEP]
+    {\sev{V}{H}{s}{V'}{H'}{s'}}
+    {\sev{V}{H}{\pop{x}{s}}{V'}{H'}{\pop{x}{s'}}} \and
+  \infer[SE-POPSKIP]
+    { }
+    {\sev{V}{H}{\pop{x}{\nop}}{V|_{\dom V - \{x\}}}{H|_{\dom H - \{V(x)\}}}{\nop}}
+\end{mathpar}
 
 \subsection*{Statement Preservation}
 \subsection*{Statement Progress}
