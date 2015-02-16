@@ -43,6 +43,19 @@ and creating a borrowed reference to the value at a L-value.
 \end{array}
 \]
 
+\subsubsection*{TODO Move this into a foot note or something}
+Rust itself and earlier models of Patina used a dramatically different form
+of loan tracking and borrow checking. A universal set of loans it kept and threaded
+through the type checker. Each loan generates a set of paths that cannot be accessed
+without violating a loan guarantee. The borrow checker would then make sure that
+no path used was in that set of forbidden paths.
+
+This structure does not lend itself to proofs, so we devised this alternate system.
+The system we present below is syntax driven and, we think, easier to understand.
+Since proving this system matches the original would run into the problem we tried
+to avoid in the first place, we satisfied ourselves with testing the two implementations.
+The original model and this model agree on all the tests used in the original model.
+
 \subsection*{Tracking Loans}
 
 When we use a L-value in an expression, we must ensure the operation we are performing on it
