@@ -11,6 +11,7 @@
 \begin{document}
 
 \newtheorem*{lem}{Lemma}
+\newtheorem*{conj}{Conjecture}
 
 % BNF shorthand
 \newcommand \bnfdef {::=}
@@ -83,6 +84,12 @@
 \newcommand \cw[2] {\textsc{can-write}({#1},{#2})}
 \newcommand \cnl[1] {\textsc{contains-no-loans}({#1})}
 \newcommand \cm[2] {\textsc{can-move}({#1},{#2})}
+\newcommand \tycopy[1] {{#1}\ \textrm{copy}}
+\newcommand \tymove[1] {{#1}\ \textrm{move}}
+\newcommand \uselv[5] {{#1};{#2}\vdash{#3}:{#4}\Rightarrow{#5}}
+\newcommand \valid[5] {{#1};{#2};{#3}\vdash{#4}\ \textrm{valid for}\ {#5}}
+\newcommand \freezable[4] {{#1};{#2}\vdash{#3}\ \textrm{freezable for}\ {#4}}
+\newcommand \unique[4] {{#1};{#2}\vdash{#3}\ \textrm{unique for}\ {#4}}
 
 \input{./intro.tex}
 \input{./paths.tex}

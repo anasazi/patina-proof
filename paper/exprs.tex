@@ -344,12 +344,153 @@ references always point to initialized memory.
 
 Note that $\cm{p}{\gs}$ implies $\cw{p}{\gs}$.
 
+\subsection*{Affine Types and Copyability}
+Values of an affine type cannot be used more than once, e.g.\ unique pointers.
+We model this in Patina by deinitializing an affine value on use.
+However, we do not want to do this unnecessarily so we need to distinguish between
+affine and non-affine types. Affine types must be moved, 
+but non-affine types can be merely copied.
+In Patina, unique pointers and borrowed mutable references are the sources of affineness.
+Unique pointers must be affine to preserve their uniqueness.
+Borrowed mutable references must be affine to preserve the unique access they promise.
+\newline
+
+\fbox{$\tycopy{\gt}$}
+
+\begin{mathpar}
+  \infer[C-INT]{ }{\tycopy{\tyint}} \and
+  \infer[C-REFIMM]{ }{\tycopy{\tyref{\lt}{\qimm}{\gt}}}
+\end{mathpar}
+
+\fbox{$\tymove{\gt}$}
+
+\begin{mathpar}
+  \infer[M-OWN]{ }{\tymove{\own{\gt}}} \and
+  \infer[M-REFMUT]{ }{\tymove{\tyref{\lt}{\qmut}{\gt}}}
+\end{mathpar}
+
+The two judgments here are not particularly interesting without compound types,
+but they still create a necessary distinction.
+Note that these two judgments partition the set of types.
+
 \subsection*{Using a L-value}
+Now that we can check that an operation is safe and we can determine from the type
+which operation to perform, we can specify how to check that using the value at a L-value 
+is safe and track how doing so changes the shadow heap.
+\newline
+
+\fbox{$\uselv{\gG}{\gU}{\lv{x}{p}}{\gt}{\gU'}$}
+
+\begin{mathpar}
+  \infer[UP-COPY]
+    {\tc{\gG}{\lv{x}{p}}{\gt} \\ \tycopy{\gt} \\ \canread{p}{\gU(x)}}
+    {\uselv{\gG}{\gU}{\lv{x}{p}}{\gt}{\gU}}
+  \and
+  \infer[UP-MOVE]
+    {\tc{\gG}{\lv{x}{p}}{\gt} \\ \tymove{\gt} \\ \cm{p}{\gU(x)} 
+    \\ \textsc{use}(\gU,\lv{x}{p},\gU') }
+    {\uselv{\gG}{\gU}{\lv{x}{p}}{\gt}{\gU'}}
+\end{mathpar}
+
+where $\textsc{use}(\gU,\lv{x}{p},\gU')$ modifies the shadow 
+of $\lv{x}{p}$ to deinitialize the affine values.
+
+\begin{conj}[L-Value Use Preservation]
+  If $\vdash\ltr$, $\tb{\ltr}{\gU}{\gG}{L}$, and $\uselv{\gG}{\gU}{\lv{x}{p}}{\gt}{\gU'}$
+  then $\tb{\ltr}{\gU'}{\gG}{L}$.
+\end{conj}
+
+\begin{proof}[Justification]
+  Using a path either leaves the shadow heap unchanged or deinitializes only a part of it,
+  neither of which should change the types of shadows or the lifetimes of loans.
+  Deinitializing part of the shadow heap could invalidate existing loans,
+  but the \text{can-read} and \textsc{can-move} checks should rule out those cases.
+\end{proof}
 
 \subsection*{Ensuring Loan Promises Can Be Upheld}
+When creating a borrowed reference, the borrow checker must ensure
+that is it actually possible to make the promises that the loan demands.
+For example, we cannot promise the interior of a borrowed reference will be 
+valid for longer than that reference's lifetime, nor can we promise that
+the interior of a immutable borrowed reference will have unique access.
+
 \subsubsection*{Validity}
-\subsubsection*{Freezability}
+Both kinds of borrowed references require that their referent be initialized for
+the lifetime of the reference, which here we call \emph{validity}.
+Variables are valid for their entire lifetime and can be loaned out for any duration
+not longer than that.
+Unique pointers inherit the lifetime of their owner.
+Borrowed references specify how long they are valid by their lifetime, and they
+can be loaned out for any duration not longer than that. Since we already know
+the interior of a borrowed reference is valid for the lifetime of that reference,
+we do not need to examine further.
+\newline
+
+\fbox{$\valid{\gG}{\ltr}{L}{\lv{x}{p}}{\lt}$}
+
+\begin{mathpar}
+  \infer[VF-BASE]{(\lt,L(x))\in\ltr}{\valid{\gG}{\ltr}{L}{\lv{x}{\base}}{\lt}} \and
+  \infer[VF-DEOWN]
+    {\tc{\gG}{\lv{x}{p}}{\own{\gt}} \\ \valid{\gG}{\ltr}{L}{\lv{x}{p}}{\lt}}
+    {\valid{\gG}{\ltr}{L}{\lv{x}{\deref{p}}}{\lt}} \and
+  \infer[VF-DEREF]
+    {\tc{\gG}{\lv{x}{p}}{\tyref{\lt'}{q}{\gt}} \\ (\lt,\lt')\in\ltr}
+    {\valid{\gG}{\ltr}{L}{\lv{x}{\deref{p}}}{\lt}}
+\end{mathpar}
+
 \subsubsection*{Uniqueness}
+Mutable loans require the loaned memory have \emph{unique} access.
+If the path being loaned has unique access, then it can give that access to the 
+new mutable borrow.
+Variables, being top level, are inherently unique along with unique pointers.
+Mutable borrows provide unique access to their interiors for their duration.
+Immutable borrows are inherently not unique.
+\newline
+
+\fbox{$\unique{\gG}{\ltr}{\lv{x}{p}}{\lt}$}
+
+\begin{mathpar}
+  \infer[UF-BASE]{ }{\unique{\gG}{\ltr}{\lv{x}{\base}}{\lt}} \and
+  \infer[UF-DEOWN]
+    {\tc{\gG}{\lv{x}{p}}{\own{\gt}} \\ \unique{\gG}{\ltr}{\lv{x}{p}}{\lt}}
+    {\unique{\gG}{\ltr}{\lv{x}{\deref{p}}}{\lt}} \and
+  \infer[UF-DEREFMUT]
+    {\tc{\gG}{\lv{x}{p}}{\tyref{\lt'}{\qmut}{\gt}} \\ (\lt,\lt')\in\ltr
+    \\ \unique{\gG}{\ltr}{\lv{x}{p}}{\lt}}
+    {\unique{\gG}{\ltr}{\lv{x}{\deref{p}}}{\lt}}
+\end{mathpar}
+
+\subsubsection*{Freezability}
+Immutable loans require the loaned memory to be \emph{frozen}, 
+unchangable by anything, for the duration of the loan.
+When creating an immutable borrow, we need to check a slightly weaker property:
+\emph{freezable}, unchangable by anything \emph{else}.
+A freezable path can be mutated, but only by the path itself.
+If the path does not mutate itself, e.g.\ by loaning itself immutably, then we know it is frozen.
+Unique paths are inherently freezable since no other path exists.
+Dereferencing through an immutable borrow, while not unique, is freezable because
+the interior of the borrow is already guaranteed to be frozen for its lifetime.
+\newline
+
+\fbox{$\freezable{\gG}{\ltr}{\lv{x}{p}}{\lt}$}
+
+\begin{mathpar}
+  \infer[FF-BASE]{ }{\freezable{\gG}{\ltr}{\lv{x}{\base}}{\lt}} \and
+  \infer[FF-DEOWN]
+    {\tc{\gG}{\lv{x}{p}}{\own{\gt}} \\ \freezable{\gG}{\ltr}{\lv{x}{p}}{\lt}}
+    {\freezable{\gG}{\ltr}{\lv{x}{\deref{p}}}{\lt}} \and
+  \infer[FF-DEREFMUT]
+    {\tc{\gG}{\lv{x}{p}}{\tyref{\lt'}{\qmut}{\gt}} \\ (\lt,\lt')\in\ltr 
+    \\ \freezable{\gG}{\ltr}{\lv{x}{p}}{\lt}}
+    {\freezable{\gG}{\ltr}{\lv{x}{\deref{p}}}{\lt}} \and
+  \infer[FF-DEREFIMM]
+    {\tc{\gG}{\lv{x}{p}}{\tyref{\lt'}{\qimm}{\gt}} \\ (\lt,\lt')\in\ltr }
+    {\freezable{\gG}{\ltr}{\lv{x}{\deref{p}}}{\lt}}
+\end{mathpar}
+
+Note how $\unique{\gG}{\ltr}{\lv{x}{p}}{\lt}$ implies $\freezable{\gG}{\ltr}{\lv{x}{p}}{\lt}$.
+This implies that anything we can borrow mutably we can also borrow immutably,
+which accurately reflects Rust.
 
 \subsection*{Expression Typing}
 
