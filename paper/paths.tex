@@ -853,6 +853,7 @@ The $\tc{V}{H}{\gU}$ judgment ensures that the shadow heap corresponds to the re
 \infer
 { 
 \dom{V}=\dom{\gU} \\\\
+\dom H = \textsc{reachable}(V,H) \\\\
 \forall x \in \dom{V}.~\tc{H}{H(V(x))}{\gU(x)}
 }
 {\tc{V}{H}{\gU}}
