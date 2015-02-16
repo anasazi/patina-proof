@@ -580,8 +580,52 @@ we require uniqueness.
 \end{proof}
 
 \subsection*{Using a Layout}
+The runtime analogue of using a L-value is using a layout.
+Affine values are replaced by void and copyable values are left untouched.
+It is not defined for $\void$, which prevents expression evalutation from utilizing
+uninitialized memory. A program that tries to do so will get stuck.
+\newline
+
+\fbox{$\textsc{use} : \textrm{Layout} \to \textrm{Layout}$}
+
+\[
+\begin{array}{lcl}
+\textsc{use}(z) &=& z \\
+\textsc{use}(\own{\ga}) &=& \void \\
+\textsc{use}(\refval{\qimm}{\ga}) &=& \refval{\qimm}{\ga} \\
+\textsc{use}(\refval{\qmut}{\ga}) &=& \void
+\end{array}
+\]
+
+Note that $\textsc{use}(l) = l'$ implies $\textsc{droppable}(l')$.
+Once we use a value, we know we can safely deallocate it.
 
 \subsection*{Expression Evaluation}
+Evaluating expressions is straightforward.
+The only unusual aspect is the case of using the value at a L-value.
+To prevent copies of affine values, we must overwrite the only value
+with the used version. If it is a copyable value, then it will remain unchanged.
+If it is an affine value, then it will be replaced with $\void$.
+Note that this means the heap resulting from expression evaluation is either
+unchanged or a more deinitialized version of the starting heap.
+Also note that the result heap may temporarily contain an orphan when considered alone,
+but not when considered together with the result layout.
+\newline
+
+\fbox{$\ev{V;H}{e}{l;H'}$}
+
+\begin{mathpar}
+  \infer[EE-INT]{ }{\ev{V;H}{z}{z;H}} \and
+  \infer[EE-REF]
+    {\ev{V;H}{\lv{x}{p}}{\ga}}
+    {\ev{V;H}{\tyref{\lt}{q}{\lv{x}{p}}}{\refval{q}{\ga};H}} \and
+  \infer[EE-USE]
+    {\ev{V;H}{\lv{x}{p}}{\ga} \\
+     \Read{H}{\ga}{l} \\
+     \textsc{write}(H,\ga,\textsc{use}(l),H')
+    }
+    {\ev{V;H}{\lv{x}{p}}{l;H'}}
+\end{mathpar}
 
 \subsection*{Expression Preservation}
 
