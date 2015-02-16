@@ -395,7 +395,7 @@ is safe and track how doing so changes the shadow heap.
 where $\textsc{use}(\gU,\lv{x}{p},\gU')$ modifies the shadow 
 of $\lv{x}{p}$ to deinitialize the affine values.
 
-\begin{conj}[L-Value Use Preservation]
+\begin{conj}[L-Value Use Shadow Preservation]
   If $\vdash\ltr$, $\tb{\ltr}{\gU}{\gG}{L}$, and $\uselv{\gG}{\gU}{\lv{x}{p}}{\gt}{\gU'}$
   then $\tb{\ltr}{\gU'}{\gG}{L}$.
 \end{conj}
@@ -493,6 +493,91 @@ This implies that anything we can borrow mutably we can also borrow immutably,
 which accurately reflects Rust.
 
 \subsection*{Expression Typing}
+With our model of the borrow checker in hand, we can finally specify the typing of expressions.
+\newline
+
+\fbox{$\tc{\gG;\ltr;L;\gU}{e}{\gt;\gU'}$}
+\newline
+
+Integer constants are trivial and do not change the shadow heap.
+
+\begin{mathpar}
+  \infer[ET-INT]{ }{\tc{\gG;\ltr;L;\gU}{z}{\tyint;\gU}}
+\end{mathpar}
+
+Using the value at a L-value simply relies on our earlier judgment.
+
+\begin{mathpar}
+  \infer[ET-USE]
+    {\uselv{\gG}{\gU}{\lv{x}{p}}{\gt}{\gU'}}
+    {\tc{\gG;\ltr;L;\gU}{\lv{x}{p}}{\gt;\gU'}}
+\end{mathpar}
+
+Creating an immutable borrowed reference requires checking that the immutable loan
+guarantees will be upheld for the entire duration of the loan.
+This involves checking that we can read the L-value now, and that we can guarantee
+its validity and freezability for the duration of the loan.
+We record the new loan in the output shadow heap.
+
+\begin{mathpar}
+  \infer[ET-REFIMM]
+    {\tc{\gG}{\lv{x}{p}}{\gt} \\
+     \canread{p}{\gU(x)} \\
+     \valid{\gG}{\ltr}{L}{\lv{x}{p}}{\lt} \\
+     \freezable{\gG}{\ltr}{\lv{x}{p}}{\lt} \\
+     \textsc{record}(\gU,\lv{x}{p},(\lt,\qimm),\gU')
+    }
+    {\tc{\gG;\ltr;L;\gU}{\tyref{\lt}{\qimm}{\lv{x}{p}}}{\gt;\gU'}}
+\end{mathpar}
+
+Similarly, creating a mutable borrowed reference requires checking the mutable loan
+guarantees. Instead of reading, we must be able to write. Instead of freezability,
+we require uniqueness.
+
+\begin{mathpar}
+  \infer[ET-REFMUT]
+  {\tc{\gG}{\lv{x}{p}}{\gt} \\
+   \cw{p}{\gU(x)} \\
+   \valid{\gG}{\ltr}{L}{\lv{x}{p}}{\lt} \\
+   \unique{\gG}{\ltr}{\lv{x}{p}}{\lt} \\
+   \textsc{record}(\gU,\lv{x}{p},(\lt,\qmut),\gU')
+  }
+  {\tc{\gG;\ltr;L;\gU}{\tyref{\lt}{\qmut}{\lv{x}{p}}}{\gt;\gU'}}
+\end{mathpar}
+
+\begin{conj}[Expression Shadow Preservation]
+  If $\vdash\ltr$, $\tb{\ltr}{\gU}{\gG}{L}$, and $\tc{\gG;\ltr;L;\gU}{e}{\gt;\gU'}$
+  then $\tb{\ltr}{\gU'}{\gG}{L}$.
+\end{conj}
+
+\begin{proof}[Justification]
+  This is trivial in the integer case and follows from L-Value Use Shadow Preservation
+  in the L-value use case, so we only need to discuss the borrow creation cases.
+  In both borrow creation cases, the only change to the shadow heap is the addition of
+  one new loan.
+
+  When creating an immutable borrow, we know from \textsc{can-read} that
+  no mutable loan exists on way to the path we are borrowing or in memory reachable from it.
+  The shadow of the interior of the loaned path is now controlled by the immutable loan
+  of the path, but since there were no mutable loans there before and it has not changed
+  it should still be well-formed. Similarly, the shadows on the way to the path have no changed
+  directly and they should not be affected by the addition of an immutable loan in their
+  interior. The main concern is whether the addition of the new immutable loan to the bank 
+  will result in a well-formed bank. We know from the validity check that the lifetime
+  of the loan is within the lifetime bound of the bank. If the bank is empty or
+  the lifetime of the old loan is not shorter than the lifetime of the new loan, then
+  the bank will still be well-formed. We could restrict \textsc{record} to only succeed
+  in this situation.
+
+  When creating a mutable borrow, we know from \textsc{can-write} that
+  no loan exists on the way to the path or in memory reachable from it.
+  So similar to the immutable case, the shadow of the interior of the path will still
+  be well-formed even though it is now controlled by a mutable loan.
+  The shadows on the way to the path are still well-formed since they have no loans to begin with.
+  As before, the only question is whether the bank of the path will remain well-formed.
+  We know from \textsc{can-write} that the bank is empty, so the new bank, consisting of
+  just one mutable loan, will be well-formed.
+\end{proof}
 
 \subsection*{Using a Layout}
 
