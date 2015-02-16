@@ -301,12 +301,12 @@ Formally,
 \begin{mathpar}
 \mprset{flushleft}
 \infer
-{ 
-\dom{H} = \dom{\gS} \\\\
+{\dom{H} = \dom{\gS} \\\\
 \forall \ga \in \dom(\gS).~\gS(\ga)~\textrm{closed} \\\\
 \forall \ga \in \dom{H}.~\tc{\gS;\gY}{H(\ga)}{\gS(\ga)} \\\\
-\forall (\ga,r) \in \dom{\gY}.~\Read{H}{\addr{\ga}{r}}{\varval{\gY(\ga,r)}{l}}
-}
+\forall (\ga,r) \in \dom{\gY}.~\Read{H}{\addr{\ga}{r}}{\varval{\gY(\ga,r)}{l}} \\\\
+\forall \ga, \ga', \ga'' \in \dom H.\ \Read{H}{\ga}{\own{\ga''}} \land
+				      \Read{H}{\ga'}{\own{\ga''}} \implies \ga = \ga' }
 {\tc{}{H}{\gS;\gY}}
 \end{mathpar}
 
