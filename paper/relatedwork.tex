@@ -1,0 +1,97 @@
+\section*{Related Work}
+
+Both ML Kit \cite{mlkit-4.3.0, mlkitregions}
+and Cyclone \cite{cycregions} heavily influenced the design of Rust.
+However, both of those languages, along with most research in the area,
+uses regions for memory management. In constrast, Rust's memory is managed
+by affine types (unique ownership), and its use of regions is for memory
+safety. Cyclone's region subtyping is the source of Rust's lifetime subtyping
+and so they ensure references do not escape in a similar fashion.
+Unlike Rust, Cyclone does not prevent access to uninitialized memory,
+e.g. it is possible to dereference a null pointer.
+Unlike Cyclone, Rust does not have first class regions, but Rust also
+lacks Cyclone's dynamic regions, which lessens the need for first class regions.
+
+Cyclone later added unique pointers and a notion of borrowing. \cite{cycsafe, cycexperience}
+Cyclone's version does not prevent memory leaks, which are possible both from
+freeing a unique pointer that contains another live unique pointer and from
+overwriting a live unique pointer. Rust statically guarantees no memory leaks in both
+of these situations. Cyclone requires an explicit swap operation for using unique versions
+of pointers that do not admit null values. Rust will allow any of its pointers to be null,
+but guarantees that they will not be used while null. Rust also does not require explicit swaps;
+Patina uses them, but that is an artifact of the model.
+Cyclone considers unique pointers "consumed" while a borrow exists, 
+whereas Rust will allow the borrowed unique pointer to be used in certain situations
+(namely, reading through an immutably borrowed unique pointer is allowed).
+Cyclone supports abstraction over the aliasability and kind (box versus region) of a pointer,
+but Rust does not currently support any such abstraction over pointer types.
+
+Walker and Watkins discuss how regions and linear types could be combined. \cite{regionsandlinear}
+Their model supports first class regions, like Cyclone, but unlike Rust.
+It also introduces the idea of linear regions and provides a mechanism for
+temporarily aliasing them. This could be a fruitful ground for Rust to explore
+when looking to support custom allocators.
+However, their model does not support mutation, which is the source of most of the complexity
+of Rust's borrow checker, and this may impact its applicability to Rust. 
+
+Gordon et al. \cite{uniqueandrefimm} introduce a static method for ensuring data-race freedom
+by enforcing that at most one mutable reference to an object exists, which is a similar task
+to Rust's effort to avoid aliased, mutable memory.
+Their work supports read-only references, which cannot be used to mutate, but to not forbid
+mutation. Since these are by definition aliased, mutable memory, Rust has no equivalent.
+However, their immutable reference is similar to Rust's immutable borrowed references,
+and their isolated referece is somewhat similar to Rust's unique pointers and mutable
+borrowed references. Isolated references can be coverted to writeable references and back,
+which allows for behavior similar to a mutable borrowed reference. Isolated references
+can also be converted into immutable references, which is analogous to immutably reborrowing
+a mutably borrowed reference. Their correspondence with unique pointers is similar.
+Gordon, Ernst, and Grossman \cite{relyguarantee} later propose a general notion of
+rely-guarantee references, which treat aliases similar to different threads of control
+and use methods from rely-guarantee program logics to ensure safety. Rust's references
+can likely be encoded in this general framework.
+
+Boyland's alias burying \cite{aliasburying} has a similar goal to Rust, i.e.
+using static checks rather than destructive reads, but differs in many details.
+Boyland a strong version of the uniqueness invariant (true uniqueness) and a weak
+version (allowing borrowed aliases), and then develops a system based on maintaing
+the strong invariant. Rust meets only the weak uniqueness invariant, but it also
+guarantees that aliased, mutable memory never exists, which allows for similar control
+over mutation as the strong uniqueness invariant. The general idea of alias burying
+is to allow for aliases, but to invalidate them when a unique field is read.
+Rust ensures at a unique value will not be read if (mutable) aliases exist.
+Rust's borrowed references are also more first-class than Boyland's, which cannot
+be stored in data structures or returned from functions.
+
+Clarke and Wrigstad's external uniqueness \cite{externaluniqueness} has a notion
+of ownership similar to Rust's. Both have recursive ownership; however, Rust uses
+it for memory management rather than for access control.
+Unlike Rust, unique pointers are nullified on use. The Patina model nullifies on use,
+but soundness ensures it does not matter in practice.
+There is also fresh owner notion for borrowed references that accomplishes the same
+thing as Rust's lifetimes, i.e. preventing escape.
+Unlike Rust, Clarke and Wrigstad's borrowed references are both copyable and mutable,
+which means they cannot make the same safety guarantees as Rust, i.e. no access to
+uninitialized memory.
+They list several options about how borrowed unique pointers can be handled, but
+Rust does not cleanly fit into these categories. Rust discriminates on the manner of borrowing
+and the operation to be performed to determine whether it is safe to use the borrowed
+unique pointer, but Clarke and Wrigstad suggest that a system must either allow all uses
+or forbid all uses.
+Their model also has problems with immutable (final) variables and unique versions
+of non-nullable pointers because they denote consumption via nullification and the finality
+prevents that. Rust, however, has both immutable variables and all of its pointers are non-null,
+but it has no issues mixing these with uniqueness. This is because Rust's ban on null pointers
+is not a ban on pointers being null, but rather on pointers being used while null.
+Additionally, Rust's immutable variables' usability can change if a unique value is consumed,
+which allows Rust to render an immutable variable unusable thereafter.
+Clarke and Wrigstad speculate that alias burying would enable them to support this combination,
+which is somewhat true. Rust does manage this via static analysis, but not via alias burying.
+
+Boyland, Noble, and Retert's capabilities for sharing \cite{capabilitiesforsharing}
+provides a general framework for describing uniqueness and read-only concepts related
+to pointers. However, Rust's pointers do not quite fit into their capability system.
+The issue involves immutably loaned unique pointers and immutably loaned mutable borrowed
+references. In Rust, both allow reading through the pointer, but do not allow reading
+the pointer itself, which would require a move. The capabilities for sharing system
+supports only whole object permissions, which prevents us from specifying this case
+of Rust's pointers in the system.
