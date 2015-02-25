@@ -1,0 +1,50 @@
+\section*{Future Work}
+The first extension to the existing work should be to prove our conjectures.
+This is necessary to put us on a firm footing for other future work, and
+to ensure we have actually included everything necessary in our model.
+
+The expression and statement layers should be extended to match the path layer.
+Product types are straightforward to add to the borrow checker and will like not
+pose much trouble. Sum types may be more difficult. In particular, matching by
+reference allows creation of references to the payload of a sum type.
+The borrow checker must ensure that the sum is not mutated while such a reference
+exists. Extending the model with recursive types will require the addition of
+top level (non-closure) recursive functions. Without the capability those functions
+give us it is impossible to free recursive values. Those functions will necessitate
+other additions, e.g. lifetime parameters. Type parameters likely do not have
+significant soundness implications by themselves, but may in their interaction with
+later features.
+
+Until recently, Rust's closures have been in flux. As of this writing, Rust supports
+both stack and heap closures and also supports different manners of access to the environment
+(owning, immutable refernce, or mutable reference). In the past, closures have been a
+common source of borrow checker bugs, which likely means that proving soundness will be
+difficult. However, it also means that it is one of the most essential features to add to Patina.
+It would likely be profitable to look to Cyclone \cite{cycregions}, which took great
+care to ensure references could not escape via closures.
+
+Traits, which are Rust's version of typeclasses or interfaces, may have similar issues.
+Traits can be used to create what is effectively an object.
+Since objects and closures are so similar, it is likely that proving trait objects sound
+will face similar difficulties.
+
+Recently, Rust has added some more advanced type system features.
+In particular, associated types and higher rank lifetimes.
+Associated types are effectively higher kinded types.
+Neither of these features will likely impact soundness, but they should still be
+carefully modeled.
+
+There are many potential features that we could explore using our model.
+Several additional versions of borrowed references has been purposed,
+e.g. write-only references or references that allow moving out as long as something
+is moved back in before the reference is released. Adding this to Patina would likely
+result in a more general borrow checking framework.
+
+One oft-requested feature is the ability to use static values in type parameters.
+This effectively gives Rust a weak form of dependent typing.
+The consequences for soundness in a affine dependently typed language with regions
+are likely significant, and the difficulty in proving them even more so.
+
+Our model made several changes to how systems worked in the Rust compiler.
+It would be interesting to compare how the model's version compares with the original
+in terms of performance, ease of understanding, and mantainability.
