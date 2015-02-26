@@ -74,7 +74,7 @@ Due to the extra structure from layouts, addressing memory now requires
 more than simple labels. Instead we use a runtime analogue of variables and paths.
 Allocations are chunks of memory allocated and freed atomically.
 They correspond to either variables or heap allocations.
-Routes provide relative specification into layouts similar to paths with two key differences.
+Routes are like paths except for two key differences.
 
 \[
 \begin{array}{lccl}
@@ -90,7 +90,7 @@ Unlike paths, there is no dereference route.
 This forces any pointer following into path evaluation (into routes)
 rather than doing so while reading memory at a route.
 The address placeholder from before is simply a pair of an allocation label and a route.
-The exception is that unique pointers needs only an allocation since a unique pointer
+The exception is that unique pointers need only an allocation since a unique pointer
 always points to a complete heap allocation.
 That is:
 
@@ -190,7 +190,7 @@ $$ V : \mathrm{Variable} \to \mathrm{Allocation} $$
 \end{mathpar}
 
 Our core operations are now defined,
-but we still need to describe the typing our runtime data
+but we still need to describe the typing of our runtime data
 so that we can properly state and prove our type preservation lemmas.
 
 \section*{Runtime Typing}
@@ -513,13 +513,13 @@ For example, here is how it can catch dereferencing a null pointer:
 }
 \end{verbatim}
 
-It can also catch a missing free that would orphan memory.
+It can also catch a missing free that would leak memory.
 \begin{verbatim}
 {
   let x: ~int = ~3;
   // the shadow of x is `~ int'
 
-  // the stack variable x will be popped off the stack, orphaning the heap memory at *x
+  // the stack variable x will be popped off the stack, leaking the heap memory at *x
   // the type checker can identify this error by seeing that the shadow of x contains `~' data
   // by requiring that shadows cannot contain `~' when freed, the type checker prevents leaks
 }
@@ -776,7 +776,7 @@ the pointees of borrowed references and the payload of initialized variants
 are fully initialized.
 The $\textsc{droppable}(l)$ judgment checks that $l$ owns no initialized heap memory,
 i.e. $\own{\addr{\ga}{r}}$ is not reachable from $l$ except through references.
-These layouts are safe to deallocate because we cannot orphan heap memory by doing so.
+These layouts are safe to deallocate because we cannot leak heap memory by doing so.
 The $\tc{V}{H}{\gU}$ judgment ensures that the shadow heap corresponds to the real heap.
 \newline
 

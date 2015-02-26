@@ -1,11 +1,32 @@
+\section*{Abstract}
+Rust is a new systems language that uses some advanced type system features,
+specifically affine types and regions, to statically guarantee memory
+safety and eliminate the need for a garbage collector.
+While each individual addition to the type system is well understood
+in isolation and are known to be sound, the combined system is not.
+Furthermore, Rust uses a novel checking scheme for its regions, known
+as the Borrow Checker, that is not known to be correct.
+Since Rust's goal is to be a safer alternative to C/C++, we should
+ensure that this safety scheme actually works. We present a formal
+semantics that camptures the key features relevant to memory safety,
+unique pointers and borrowed references, specifies how they guarantee
+memory safety, and describes the operation of the Borrow Checker.
+We used this model to prove the soudness of some core operations
+and justify the conjecture that the model, as a whole, is sound.
+Additionally, our model provides a syntactic version of the Borrow
+Checker, which may be more understandable than the non-syntactic version
+in Rust.
+
 \section*{Overview}
-Rust makes strong claims about ensuring memory safety without garbage collection.
+The Rust Programming Language~\cite{rust} makes strong claims about 
+ensuring memory safety without garbage collection.
 We would like to prove that those claims are true.
 To that end, we use a small model of Rust, called Patina, that characterizes the key
 features of Rust under the most suspicion, namely its memory management.
 
 Rust memory management has two goals:
-no memory should ever be orphaned and no uninitialized memory should ever be read.
+no memory should ever become unreachable without being deallocated
+and no uninitialized memory should ever be read.
 Rust tries to achieve this by maintaining two invariants:
 all memory has a unique owner responsible for deallocating it and
 no memory is ever simultaneously aliased and mutable.
@@ -15,15 +36,17 @@ Ownership tracking of heap memory is managed by unique pointers.
 Safe aliasing is managed by borrowed references.
 
 The Patina model has three layers.
-The innermost layer deals with L-values and ensures no uninitialized pointer
-ever needs to be dereferenced. It also ensures that initialization data correctly
+The innermost layer deals with L-values and ensures 
+no uninitialized data is ever used, which includes ensuring
+that uninitialized pointers and null pointers are never dereferenced.
+It also ensures that compile-time initialization information correctly
 models the runtime memory.
 The middle layer deals with R-values.
-It ensures that an L-values used do not violate initialization or borrow restrictions.
+It ensures that any L-values used do not violate initialization or borrow restrictions.
 It also ensures that borrowed references are not created unless they are safe.
 The outer layer deals with statements.
 It mostly just chains together the guarantees of the L-value and R-value layers.
-However, it is also responsible for ensuring no orphans would be created when deallocating memory.
+However, it is also responsible for ensuring no leaks would be created when deallocating memory.
 
 \subsection*{Unique Pointers in Rust}
 In Rust, unique pointers are the owners of heap memory.
@@ -57,11 +80,11 @@ However, these deinitialized paths can be reinitialized.
 }
 \end{verbatim}
 
-Unique pointers can also be freed if they would be orphaned by assignment.
+Unique pointers can also be freed if they would be leaked by assignment.
 \begin{verbatim}
 {
   let x: ~~int = ~~3;
-  *x = ~1; // The ~3 that *x points too would be orphaned here. It is freed instead.
+  *x = ~1; // The ~3 that *x points too would be leaked here. It is freed instead.
 }
 \end{verbatim}
 
@@ -69,12 +92,19 @@ This is not a dynamic check.
 The compiler detects when heap memory should be freed and inserts the necessary code.
 
 \subsection*{Unique Pointers in Patina}
-To check that the Rust compiler does this correctly, Patina uses a shallow free statement.
+When unique pointers fall out of scope in Rust, the compiler inserts code at the end
+of the block that will actually free the allocated heap memory. This code will
+traverse the entire owned data structure and free memory without leaking anything.
+In the case of recursive data structures, this code will be a recursive function.
+Rather than model such complex behavior as a primitive in Patina, we will use only
+a shallow free statement. Aside from making the model simpler, this also provides us
+with a means of checking that the code Rust inserts to free memory is correct,
+i.e.\ by encoding it in terms of Patina's shallow frees.
 The only way to deallocate a unique pointer in Patina is with these explicit frees.
 \begin{verbatim}
 {
   let x: ~~int = ~~3;
-  //free(x); // ERROR! would orphan *x
+  //free(x); // ERROR! would leak *x
   // The proper way
   free(*x);
   free(x);
@@ -92,12 +122,14 @@ Finally, the free statement requires that the pointer is unaliased, preventing d
 \begin{verbatim}
 {
   let x: ~int = ~3;
-  let y: &int = &*x; // Create an immutable borrowed reference to *x
+  // Create an immutable borrowed reference to *x with &
+  // Immutable borrowed references to some type A are denoted by &A
+  let y: &int = &*x;
   free(x); // ERROR! would make y a dangling pointer
 }
 \end{verbatim}
 
-\subsection*{Borrowed Referenced}
+\subsection*{Borrowed References}
 Often, particularly in functions, we want to use some memory, but do not intend to free it.
 That is, we want to borrow access to memory owned by something else.
 This is fine for copyable values, like integers, 
@@ -126,7 +158,7 @@ fn foo(x: &int) -> int {
 
 {
   let x: ~int = ~1;
-  let y: int = foo(&*x);
+  let y: int = foo(&*x); // Rust lets us write foo(x) here and will insert the &* for us
   // x = ~1, y = 2
 }
 \end{verbatim}
@@ -193,67 +225,6 @@ fn foo() -> &int {
 }
 \end{verbatim}
 
-
-%\subsection*{Borrowed References}
-%Borrowed references are a means to provide safe, temporary aliases in Rust.
-%They do so by enforcing two invariants.
-%The first is that references are always valid.
-%\begin{verbatim}
-%{
-%  let x: int; // An uninitialized stack integer
-%  let y: &int = &x; // ERROR! *y would point to uninitialized memory
-%}
-%\end{verbatim}
-%This also extends to cases where the referent falls out of scope too soon.
-%\begin{verbatim}
-%{
-%  let y: &int;
-%  {
-%    let x: int = 3;
-%    y = &x; // ERROR! x does not live long enough
-%  } // x would be freed here
-%  // *y would point to unallocated memory here
-%}
-%\end{verbatim}
-%The second invariant is to prevent any memory from being simultaneously aliased and mutable.
-%This is to avoid situtations like the following:
-%\begin{verbatim}
-%{
-%  let x: Option<int> = Some(3);
-%  let y: &int = match x {
-%    Some(ref z) => z,
-%    None => fail!(), // Impossible
-%  }
-%  // If x is mutable, then the payload 3 is both aliased and mutable
-%  x = None // The payload is now uninitialized so *y is a dangling pointer
-%}
-%\end{verbatim}
-%Therefore immutable borrows freeze the underlying data.
-%It cannot be mutated by anything while the borrow exists.
-%However, it is freely copyable.
-%\begin{verbatim}
-%{
-%  let x: int = 3;
-%  let y: &int = &x;
-%  let z: &int = y; // Both y and z are readable
-%  x = 2; // ERROR! x is frozen by y
-%}
-%\end{verbatim}
-%Conversely, mutable borrows forbid all other access to the underlying data.
-%It does allow the data to be mutated, but it is an affine datatype like unique pointers.
-%\begin{verbatim}
-%{
-%  let x: int = 3;
-%  let y: &mut int = &mut x;
-%  //let z: int = x; // ERROR! cannot use x while mutable borrowed
-%  let z: int = *y; // OK
-%
-%  let w: &mut int = y; // Moves y into w. y is not uninitialized
-%  z = *y; // ERROR! y is uninitialized
-%}
-%\end{verbatim}
-%As with unique pointers, these checks are all static.
-
 \section*{Types}
 Values in Patina can be described by the following types:
 \[
@@ -269,7 +240,8 @@ Values in Patina can be described by the following types:
 
 $\own{\gt}$ is a unique pointer to a $\gt$.
 $\tyref{\lt}{q}{\gt}$ is a borrowed reference to a $\gt$
-providing mutability guarantee $q$ for lifetime $\lt$.
-$\subvar{\gt}{i}{n}$ is a variant type.
+providing mutability guarantee $q$ for lifetime $\lt$, which is Rust's name
+for regions associated with stack frames.
+$\subvar{\gt}{i}{n}$ is a discriminated union or a variant type.
 $\subrec{\gt}{i}{n}$ is a tuple type.
 Finally, $\tyfix{X}{\gt}$ is a recursive type.

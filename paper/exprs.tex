@@ -621,7 +621,7 @@ with the used version. If it is a copyable value, then it will remain unchanged.
 If it is an affine value, then it will be replaced with $\void$.
 Note that this means the heap resulting from expression evaluation is either
 unchanged or a more deinitialized version of the starting heap.
-Also note that the result heap may temporarily contain an orphan when considered alone,
+Also note that the result heap may temporarily contain a leak when considered alone,
 but not when considered together with the result layout.
 \newline
 

@@ -9,7 +9,7 @@ and initializes the path with a new unique pointer.
 Treating this as a statement rather than an expression
 simplifies the expression preservation and progress lemmas.
 Note that both versions are for \emph{initialization} and not \emph{assignment}.
-We only allow initialization of droppable paths, which we guarantee will not orphan memory.
+We only allow initialization of droppable paths, which we guarantee will not leak memory.
 $\swap{\lv{x}{p}}{\lv{x}{p}}$ will perform a shallow swap of two writable paths.
 This is the only way to actually mutate through a mutable borrow since we do not allow
 interior of a borrowed reference to be uninitialized even temporarily.
@@ -98,7 +98,7 @@ be writable. Since the writability guarantees no part is loaned, the shadow heap
     {\tc{\gG;\ltr;L;\gU}{\swap{\lv{x_1}{p_1}}{\lv{x_2}{p_2}}}{\gU}}
 \end{mathpar}
 
-Initializing with a value requires that the path be droppable so that nothing will be orphaned.
+Initializing with a value requires that the path be droppable so that nothing will be leaked.
 It also requires the expression type to be a subtype of the path type.
 As discussed above, this refers to lifetimes: the subtype lifetime is greater than or
 equal to the lifetime of the supertype. This requirement guarantees that the value
@@ -150,7 +150,7 @@ will replace the shadow with $\uninit$.
 Pushing a new stack variable involves checking that the body is well typed
 under the appropriately extended contexts. Newly pushed variables start uninitialized.
 By the end of the body, the variable must be droppable so that popping it will not
-orphan memory. When checking the body, we extend the lifetime relation with the new lifetime
+leak memory. When checking the body, we extend the lifetime relation with the new lifetime
 by adding the new lifetime as the smallest lifetime in the relation (it is related to everything
 else). Afterwards, we must filter everything involving this lifetime from the shadow heap.
 This should only consist of removing loans from banks. We also "deallocate" the stack variable
@@ -286,7 +286,7 @@ Statement progress is essentially the assertion that a well-typed statement will
 never attempt to read uninitialized memory, free borrowed memory, and so on.
 Essentially, that well-typed programs have sufficient memory safety to take a step.
 The restriction to statements that end with an empty shadow heap allows us
-to avoid the cases with orphan memory.
+to avoid the cases with leaked memory.
 
 \begin{conj}[Statement Progress]
   If $\tc{}{H}{\gS}$, $\gG;V\vdash\gS$, $\vdash\ltr$, $\tb{\ltr}{\gU}{\gG}{L}$,
