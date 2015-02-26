@@ -244,7 +244,7 @@ Typing for layouts and cells is what you would expect.
 However, we restrict the type of $\void$ to the possible types for other
 kinds of cells, i.e. $\tyint$, unique pointers, and borrowed references.
 This means that multi-cell layout types (variants, tuples, and recursive types) imply
-a non-$\void$ value.
+a non-$\void$ value (though they can still contain $\void$s).
 \newline
 
 \fbox{$\tc{\gS;\gY}{l}{\gt}$}
@@ -296,6 +296,11 @@ With runtime typing now in hand, we can say what it means for the heap to be wel
 We say a heap $H$ is described by a heap type $\gS$ and a discriminant context $\gY$ if
 every allocation in $H$ has the type assigned to it by $\gS$
 and $\gY$ correctly records the discrimiants of all the variants in $H$.
+The last hypothesis enforces the uniqueness of unique pointers by requiring
+that if a unique pointer is at any address, then that address is unique.
+This strengthens our induction hypothesis enough to show that no memory has
+multiple owners, which we need to prove that no double frees occur.
+Ensuring every piece of memory has at least one owner is handled elsewhere.
 Formally,
 
 \begin{mathpar}
@@ -305,8 +310,9 @@ Formally,
 \forall \ga \in \dom(\gS).~\gS(\ga)~\textrm{closed} \\\\
 \forall \ga \in \dom{H}.~\tc{\gS;\gY}{H(\ga)}{\gS(\ga)} \\\\
 \forall (\ga,r) \in \dom{\gY}.~\Read{H}{\addr{\ga}{r}}{\varval{\gY(\ga,r)}{l}} \\\\
-\forall \ga, \ga', \ga'' \in \dom H.\ \Read{H}{\ga}{\own{\ga''}} \land
-				      \Read{H}{\ga'}{\own{\ga''}} \implies \ga = \ga' }
+\forall \ga, \ga', \ga'' \in \dom H.\ \forall r, r.\ 
+    \Read{H}{\addr{\ga}{r}}{\own{\ga''}} \land
+    \Read{H}{\addr{\ga'}{r'}}{\own{\ga''}} \implies \addr{\ga}{r} = \addr{\ga'}{r'} }
 {\tc{}{H}{\gS;\gY}}
 \end{mathpar}
 
@@ -768,7 +774,7 @@ of certain subcases of dereferences in later proofs.
   \end{itemize}
 \end{proof}
 
-\section*{Shadow Coherence}
+\section*{Shadow Checking the Heap}
 Of course, we also need to check that our shadow heap correctly models
 the actual heap. For the most part, it is exactly the relation you would expect.
 The use of \textsc{init} in \textsc{LS-REF} and \textsc{LS-VAR} ensures that
@@ -860,7 +866,6 @@ The $\tc{V}{H}{\gU}$ judgment ensures that the shadow heap corresponds to the re
 \end{mathpar}
 
 \section*{Shadow Preservation}
-The second main preservation lemma for our core operations.
 The initialization data, in the form of a shadow,
 is preserved by path evaulation and \textsc{read}
 so that the resulting layout is correctly described by the shadow.
@@ -958,13 +963,14 @@ so that the resulting layout is correctly described by the shadow.
 Finally, we have all we need to proof path evaluation progress under the right circumstances.
 Assuming all our contexts and the heap are well-formed,
 then a shallowly initialized, well-typed path can evaluate to some route.
-We can then rely to path preservation to show that route has the same type as the path.
+We can then rely on path preservation to show that route has the same type as the path.
 Read safety then lets us show that we can read a layout at that route
 and that it has the same type. Shadow preservation guarantees us that our
 model of the layout reflects reality. All of the key pieces we need for
 the higher layers of Patina.
 
 \begin{lem}[Path Progress]
+  \raggedright{}
   If $\tc{}{H}{\gS;\gY}$, $\gG;V\vdash\gS$, $\tc{}{\gU}{\gG}$, $\tc{V}{H}{\gU}$,
   $\tc{\gG}{\lv{x}{p}}{\gt}$, and $\shallow{\gU}{\lv{x}{p}}{\gs}$
   then there is some $\addr{\ga}{r}$ such that $\ev{V;H}{\lv{x}{p}}{\addr{\ga}{r}}$.

@@ -1,7 +1,6 @@
 \section*{R-Values}
 
 R-values in Patina are expressions that can evaluate to a layout.
-Effectively, they are all the ways to construct values that can be deconstructed by L-values.
 This layer of Patina involves the borrow checker, which ensures the borrowed reference guarantees.
 In order to focus on the details of the borrow checker, we will pare down our types.
 Variants, tuples, and recursive types have straightforward behavior here 
@@ -43,9 +42,11 @@ and creating a borrowed reference to the value at a L-value.
 \end{array}
 \]
 
-\subsubsection*{TODO Move this into a foot note or something}
+\subsection*{Tracking Loans\footnotemark}
+
+\footnotetext {
 Rust itself and earlier models of Patina used a dramatically different form
-of loan tracking and borrow checking. A universal set of loans it kept and threaded
+of loan tracking and borrow checking. A universal set of loans is kept and threaded
 through the type checker. Each loan generates a set of paths that cannot be accessed
 without violating a loan guarantee. The borrow checker would then make sure that
 no path used was in that set of forbidden paths.
@@ -55,10 +56,9 @@ The system we present below is syntax driven and, we think, easier to understand
 Since proving this system matches the original would run into the problem we tried
 to avoid in the first place, we satisfied ourselves with testing the two implementations.
 The original model and this model agree on all the tests used in the original model.
+}
 
-\subsection*{Tracking Loans}
-
-When we use a L-value in an expression, we must ensure the operation we are performing on it
+When we use an L-value in an expression, we must ensure the operation we are performing on it
 does not violate the promises of existing loans, and we must ensure that the value it refers
 to is fully initialized. When we create a borrowed reference, we must ensure that the
 promises of the borrow can actually be upheld for the duration of the borrow.
@@ -87,7 +87,7 @@ Thus, we make the reference hole recursive: $\refval{q}{\gs}$.
 
 \subsection*{Shadow Typing with Banks}
 Since our shadows now include loan information, we need to modify our shadow typing.
-While we have include lifetimes in our model from the beginning, this is the first time
+While we have included lifetimes in our model from the beginning, this is the first time
 we will actually utilize them. Before we can discuss how to check banks, we must first
 discuss what lifetimes are, where they come from, and what they give us.
 
@@ -113,7 +113,7 @@ totality of our lifetimes.
 As mentioned before, lifetimes come from scope blocks.
 This means that every variable has a lifetime, which comes from the block it was defined in.
 Since variables are deallocated at the end of the block in which they are defined,
-that lifetime is a accurate model. We record the lifetimes of variables in a new context:
+that lifetime is an accurate model. We record the lifetimes of variables in a new context:
 
 $$ L : \textrm{Variable} \rightarrow \textrm{Lifetime} $$
 
@@ -201,10 +201,6 @@ loans.
   \infer[HT-UNREF]{(\lt,\lt')\in\ltr}{\tcb{\ltr}{\uninit}{\tyref{\lt'}{q}{\gt}}{mq}{\lt}} \and
   \infer[HT-INT]{ }{\tcb{\ltr}{\tyint}{\tyint}{mq}{\lt}} \and
   \infer[HT-OWN]{\tcb{\ltr}{\gs}{\gt}{mq}{\lt}}{\tcb{\ltr}{\own{\gs}}{\own{\gt}}{mq}{\lt}} \and
-  %\infer[HT-REF]
-    %{(\lt, \lt') \in \ltr \\ \tcb{\ltr}{\gs}{\gt}{mq}{\lt} \\ \gs\ \textrm{init}}
-    %{\tcb{\ltr}{\refval{q}{\gs}}{\tyref{\lt'}{q}{\gt}}{mq}{\lt}}
-
   \and
   \infer[HT-REFMUT]
     {(\lt, \lt') \in \ltr \\ \tcb{\ltr}{\gs}{\gt}{mq}{\lt} \\ \gs\ \textrm{init}}
@@ -217,16 +213,12 @@ loans.
 
 \end{mathpar}
 
-where $\gs\ \textrm{init}$ is a judgment that ensures a shadow is fully initialized,
+where ``$\gs\ \textrm{init}$'' in HT-REFMUT and HT-REFIMM is a judgment 
+that ensures a shadow is fully initialized,
 i.e.\ it cannot reach a $\uninit$.
 Note that the interior of immutable borrowed references is always controlled
 by an immutable loan. This prevents mutable loans of the interior of immutable borrows,
 which are nonsensical.
-
-%need to think about how the qualifier of a borrowed reference impacts the kind of controlling loan of its contents. Ex: a mutable loan of the dereference of an immutable borrow should be forbidden. Dereferences of mutable borrows can be loaned either way...
-%Perhaps the interior of an immutable borrow should be controlled by $\qimm$ always,
-%and the interior of a mutable borrow should be controlled by the incoming controller.
-%That seems sensible since immutable loans overpower mutable loans ... it's a similar pattern.
 
 \subsubsection*{Bounded Shadow Heap Well-Formedness}
 With our shadow typing updated to check banks,
@@ -255,7 +247,7 @@ We cannot write to a path that has promised to remain unchanged or that we canno
 We cannot move from a path that we do not own or that we cannot write.
 
 Additionally, we can only use a path that is fully initialized, or our program might
-try to touch a uninitialized value and get stuck.
+try to touch an uninitialized value and get stuck.
 This means that $\shallow{\gU}{\lv{x}{p}}{\gs}$ holds and that $\gs\ \textrm{init}$ holds. 
 That is, enough memory is initialized to evaluate the L-value to a memory location,
 and everything reachable from that location is initialized.
