@@ -1,14 +1,21 @@
 \section*{Related Work}
 
+Safe dialects of C, unique pointers, borrowed references, 
+regions, and other topics relevant to Rust each have long
+and full histories. Rather than attempt to catalogue them in detail
+and compare Rust with each of its ancestors, we will limit our discussion
+to the most closely related work we are aware of.
+
 Both ML Kit \cite{mlkit-4.3.0, mlkitregions}
 and Cyclone \cite{cycregions} heavily influenced the design of Rust.
 However, both of those languages, along with most research in the area,
 uses regions for memory management. In constrast, Rust's memory is managed
-by affine types (unique ownership), and its use of regions is for memory
-safety. Cyclone's region subtyping is the source of Rust's lifetime subtyping
+by affine types (unique ownership), and uses regions (lifetimes in Rust)
+more for ensuring the safety of borrowed references than for managing memory.
+Cyclone's region subtyping is the source of Rust's lifetime subtyping
 and so they ensure references do not escape in a similar fashion.
-Unlike Rust, Cyclone does not prevent access to uninitialized memory,
-e.g. it is possible to dereference a null pointer.
+Like Cyclone, Rust prevents access to uninitialized memory,
+but Rust goes further than Cyclone by statically preventing dereferences of null pointers.
 Unlike Cyclone, Rust does not have first class regions, but Rust also
 lacks Cyclone's dynamic regions, which lessens the need for first class regions.
 
@@ -20,11 +27,21 @@ of these situations. Cyclone requires an explicit swap operation for using uniqu
 of pointers that do not admit null values. Rust will allow any of its pointers to be null,
 but guarantees that they will not be used while null. Rust also does not require explicit swaps;
 Patina uses them, but that is an artifact of the model.
-Cyclone considers unique pointers "consumed" while a borrow exists, 
+Cyclone considers unique pointers ``consumed'' while a borrow exists, 
 whereas Rust will allow the borrowed unique pointer to be used in certain situations
 (namely, reading through an immutably borrowed unique pointer is allowed).
 Cyclone supports abstraction over the aliasability and kind (box versus region) of a pointer,
 but Rust does not currently support any such abstraction over pointer types.
+
+Overall, Rust and Cyclone are each more expressive in different ways.
+Cyclone's dynamic regions make it much easier to specify the lifetime of
+a particular heap data structure, and they allow for heap structures that
+are difficult or impossible to express in Rust, such as a doubly linked list.
+Rust supports far more detailed reasoning about when memory should be freed
+due to its flow-sensitivity, and Rust offers safer and more convenient
+usage of linear data structures, particularly with regard to freeing them.
+Cyclone still has much Rust can learn from, e.g. a mechanism similar to
+dynamic regions could be used to support custom allocators in Rust.
 
 Walker and Watkins discuss how regions and linear types could be combined. \cite{regionsandlinear}
 Their model supports first class regions, like Cyclone, but unlike Rust.
@@ -52,7 +69,7 @@ can likely be encoded in this general framework.
 
 Boyland's alias burying \cite{aliasburying} has a similar goal to Rust, i.e.
 using static checks rather than destructive reads, but differs in many details.
-Boyland a strong version of the uniqueness invariant (true uniqueness) and a weak
+Boyland defines a strong version of the uniqueness invariant (true uniqueness) and a weak
 version (allowing borrowed aliases), and then develops a system based on maintaing
 the strong invariant. Rust meets only the weak uniqueness invariant, but it also
 guarantees that aliased, mutable memory never exists, which allows for similar control
