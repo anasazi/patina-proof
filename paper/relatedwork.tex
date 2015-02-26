@@ -54,7 +54,7 @@ of Rust's borrow checker, and this may impact its applicability to Rust.
 Gordon et al. \cite{uniqueandrefimm} introduce a static method for ensuring data-race freedom
 by enforcing that at most one mutable reference to an object exists, which is a similar task
 to Rust's effort to avoid aliased, mutable memory.
-Their work supports read-only references, which cannot be used to mutate, but to not forbid
+Their work supports read-only references, which cannot be used to mutate, but do not forbid
 mutation. Since these are by definition aliased, mutable memory, Rust has no equivalent.
 However, their immutable reference is similar to Rust's immutable borrowed references,
 and their isolated referece is somewhat similar to Rust's unique pointers and mutable
@@ -84,7 +84,7 @@ of ownership similar to Rust's. Both have recursive ownership; however, Rust use
 it for memory management rather than for access control.
 Unlike Rust, unique pointers are nullified on use. The Patina model nullifies on use,
 but soundness ensures it does not matter in practice.
-There is also fresh owner notion for borrowed references that accomplishes the same
+There is also a fresh owner notion for borrowed references that accomplishes the same
 thing as Rust's lifetimes, i.e. preventing escape.
 Unlike Rust, Clarke and Wrigstad's borrowed references are both copyable and mutable,
 which means they cannot make the same safety guarantees as Rust, i.e. no access to
@@ -112,3 +112,17 @@ references. In Rust, both allow reading through the pointer, but do not allow re
 the pointer itself, which would require a move. The capabilities for sharing system
 supports only whole object permissions, which prevents us from specifying this case
 of Rust's pointers in the system.
+
+Potanin et al. \cite{ooimmutability} survey the various ways of adding immutability
+to object-oriented languages and how it impacts aliasing, including Javari, OIGJ, and Joe$_3$.
+These systems usually add immutable objects and/or read-only references, but they do not
+provide the no aliased, mutable memory guarantee of Rust. As discussed earlier, read-only
+references are antithetical to Rust's memory safety invariant. Immutable objects are similar
+to Rust's immutably borrowed references, but the OO systems often go further by allowing
+immutability at the field level. Rust does not allow programmers to specify the
+mutability of particular fields, but immutable borrows can provide a temporary guarantee
+that is similar. Several of the OO systems have a concept of ownership, but it is primarily
+about encapsulation and access control. 
+Rust handles encapsulation via its module system rather than
+via the type system or static analysis. As usual with OO languages, they rely on garbage
+collection for memory management, which is very unlike Rust.

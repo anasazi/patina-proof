@@ -12,7 +12,7 @@ Note that both versions are for \emph{initialization} and not \emph{assignment}.
 We only allow initialization of droppable paths, which we guarantee will not leak memory.
 $\swap{\lv{x}{p}}{\lv{x}{p}}$ will perform a shallow swap of two writable paths.
 This is the only way to actually mutate through a mutable borrow since we do not allow
-interior of a borrowed reference to be uninitialized even temporarily.
+the interior of a borrowed reference to be uninitialized even temporarily.
 $\free{\lv{x}{p}}$ performs a shallow free and is the inverse of \textsf{new}.
 $\push{\lt}{x}{\gt}{s}$ will create a new stack variable.
 $\pop{x}{s}$ will pop that stack variable once the statement that requires it finishes.
@@ -188,7 +188,7 @@ memory it allocates. Assuming of course that evaluation preserves the shadow hea
 \subsection*{Statement Evaluation}
 Statement evaluation goes as you would expect.
 We use a new helper judgment $\textsc{fresh}(\ga)$ that generates a unused allocation.
-As before, we utilize domain restriction to "deallocate".
+As before, we utilize domain restriction to ``deallocate''.
 Other than that, we simply use path and expression evaluation combined
 with \textsc{read} and \textsc{write}.
 \newline
@@ -251,10 +251,11 @@ Put another way, this lemma asserts that memory safe programs step to memory saf
 It is difficult to specify how the new versions of contexts relate to the old versions.
 They may be larger or smaller depending upon the statement in question.
 We do not specify this relationship currently.
-Instead we just rely on the new variable map, heap and statement to enforce
+Instead we just rely on the new variable map, heap, and statement to enforce
 the relationship.
 
 \begin{conj}[Statement Preservation]
+  \raggedright
   If $\tc{}{H}{\gS}$, $\gG;V\vdash\gS$, $\vdash\ltr$, $\tb{\ltr}{\gU}{\gG}{L}$,
   $\tc{V}{H}{\gU}$, $\tc{\gG;\ltr;L;\gU}{s}{\gU_0}$, and $\sev{V}{H}{s}{V'}{H'}{s'}$
   then there exist $\gS'$, $\gG'$, $\ltr'$, $L'$, and $\gU'$ such that
@@ -306,6 +307,6 @@ to avoid the cases with leaked memory.
 
 \section*{Patina Soundness}
 If our conjectures hold, then we have established soundness for Patina.
-This means that well-typed statement that ends with an empty shadow heap
+This means that a well-typed statement that ends with an empty shadow heap
 will not leak memory, not access uninitialized memory, not create aliased, mutable memory,
 and so on. In effect, well-typed programs are statically guaranteed to be memory safe.

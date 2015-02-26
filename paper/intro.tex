@@ -8,10 +8,10 @@ Furthermore, Rust uses a novel checking scheme for its regions, known
 as the Borrow Checker, that is not known to be correct.
 Since Rust's goal is to be a safer alternative to C/C++, we should
 ensure that this safety scheme actually works. We present a formal
-semantics that camptures the key features relevant to memory safety,
+semantics that captures the key features relevant to memory safety,
 unique pointers and borrowed references, specifies how they guarantee
 memory safety, and describes the operation of the Borrow Checker.
-We used this model to prove the soudness of some core operations
+We use this model to prove the soudness of some core operations
 and justify the conjecture that the model, as a whole, is sound.
 Additionally, our model provides a syntactic version of the Borrow
 Checker, which may be more understandable than the non-syntactic version

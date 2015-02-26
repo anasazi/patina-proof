@@ -33,8 +33,8 @@ Going forward, we will use this subset of our earlier language:
 Routes would only consist of $\base$, so they are now elided.
 Without variants, the $\gY$ context is irrelevant, so it is elided as well.
 
-We define three kinds of expressions: integer constants, using the value at a L-value, 
-and creating a borrowed reference to the value at a L-value.
+We define three kinds of expressions: integer constants, using the value at an L-value, 
+and creating a borrowed reference to the value at an L-value.
 
 \[
 \begin{array}{lccl}
@@ -378,9 +378,9 @@ The two judgments here are not particularly interesting without compound types,
 but they still create a necessary distinction.
 Note that these two judgments partition the set of types.
 
-\subsection*{Using a L-value}
+\subsection*{Using an L-value}
 Now that we can check that an operation is safe and we can determine from the type
-which operation to perform, we can specify how to check that using the value at a L-value 
+which operation to perform, we can specify how to check that using the value at an L-value 
 is safe and track how doing so changes the shadow heap.
 \newline
 
@@ -409,7 +409,7 @@ of $\lv{x}{p}$ to deinitialize the affine values.
   Using a path either leaves the shadow heap unchanged or deinitializes only a part of it,
   neither of which should change the types of shadows or the lifetimes of loans.
   Deinitializing part of the shadow heap could invalidate existing loans,
-  but the \text{can-read} and \textsc{can-move} checks should rule out those cases.
+  but the \textsc{can-read} and \textsc{can-move} checks should rule out those cases.
 \end{proof}
 
 \subsection*{Ensuring Loan Promises Can Be Upheld}
@@ -510,7 +510,7 @@ Integer constants are trivial and do not change the shadow heap.
   \infer[ET-INT]{ }{\tc{\gG;\ltr;L;\gU}{z}{\tyint;\gU}}
 \end{mathpar}
 
-Using the value at a L-value simply relies on our earlier judgment.
+Using the value at an L-value simply relies on our earlier judgment.
 
 \begin{mathpar}
   \infer[ET-USE]
@@ -565,7 +565,7 @@ we require uniqueness.
   no mutable loan exists on way to the path we are borrowing or in memory reachable from it.
   The shadow of the interior of the loaned path is now controlled by the immutable loan
   of the path, but since there were no mutable loans there before and it has not changed
-  it should still be well-formed. Similarly, the shadows on the way to the path have no changed
+  it should still be well-formed. Similarly, the shadows on the way to the path have not changed
   directly and they should not be affected by the addition of an immutable loan in their
   interior. The main concern is whether the addition of the new immutable loan to the bank 
   will result in a well-formed bank. We know from the validity check that the lifetime
@@ -585,7 +585,7 @@ we require uniqueness.
 \end{proof}
 
 \subsection*{Using a Layout}
-The runtime analogue of using a L-value is using a layout.
+The runtime analogue of using an L-value is using a layout.
 Affine values are replaced by void and copyable values are left untouched.
 It is not defined for $\void$, which prevents expression evalutation from utilizing
 uninitialized memory. A program that tries to do so will get stuck.
@@ -607,8 +607,8 @@ Once we use a value, we know we can safely deallocate it.
 
 \subsection*{Expression Evaluation}
 Evaluating expressions is straightforward.
-The only unusual aspect is the case of using the value at a L-value.
-To prevent copies of affine values, we must overwrite the only value
+The only unusual aspect is the case of using the value at an L-value.
+To prevent copies of affine values, we must overwrite the original value
 with the used version. If it is a copyable value, then it will remain unchanged.
 If it is an affine value, then it will be replaced with $\void$.
 Note that this means the heap resulting from expression evaluation is either
@@ -640,6 +640,7 @@ then that layout has the same type as the expression, the resulting shadow heap
 is well-formed, and the resulting heap is consistent with the resulting shadow heap.
 
 \begin{conj}[Expression Preservation]
+  \raggedright
   If $\tc{}{H}{\gS}$, $\gG;V\vdash\gS$, $\vdash\ltr$, $\tb{\ltr}{\gU}{\gG}{L}$, 
   $\tc{V}{H}{\gU}$, $\tc{\gG;\ltr;L;\gU}{e}{\gt;\gU'}$, and $\ev{V;H}{e}{l;H'}$
   then $\tc{\gS}{l}{\gt}$, $\tc{}{H'}{\gS}$, $\tb{\ltr}{\gU'}{\gG}{L}$, and $\tc{V}{H'}{\gU'}$.
@@ -674,6 +675,7 @@ Since we do not nest expressions, no induction is necessary.
 Each case constructs the resulting values in a straightforward manner.
 
 \begin{conj}[Expression Progress]
+  \raggedright
   If $\tc{}{H}{\gS}$, $\gG;V\vdash\gS$, $\vdash\ltr$, $\tb{\ltr}{\gU}{\gG}{L}$,
   $\tc{V}{H}{\gU}$, and $\tc{\gG;\ltr;L;\gU}{e}{\gt;\gU'}$
   then there exists a layout $l$ and a heap $H'$ such that $\ev{V;H}{e}{l;H'}$.

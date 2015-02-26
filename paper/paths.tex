@@ -318,7 +318,7 @@ Formally,
 
 \section*{Read Safety}
 We are now in position to prove that our read operation is safe.
-That is, if the heap is well formed and a route is has some type,
+That is, if the heap is well formed and a route has some type,
 then we can read some layout at that route and that layout has that same type.
 This is effectively a merger of the type preservation and progress lemmas for \textsc{read}.
 
@@ -382,7 +382,7 @@ the map $V$ preserves typing.
 \end{mathpar}
 
 Finally, we can state and prove path type preservation.
-Under well-formed heap and contexts, typed paths evaluate to routes of the same type.
+Under a well-formed heap and contexts, typed paths evaluate to routes of the same type.
 
 \begin{lem}[Path Type Preservation]
   If $\tc{}{H}{\gS;\gY}$, $\gG;V\vdash\gS$, $\tc{\gG}{\lv{x}{p}}{\gt}$,
@@ -470,7 +470,7 @@ share the same initialization state.
 Second, while the pointer cells contain routes, the pointer holes do not
 contain paths (the analogue of routes).
 For references, there is no need because references always point to fully initialized things.
-Therefore, the reference hole simply records the type of the reference.
+Therefore, the reference hole simply records the type of the referent.
 For unique pointers, there is no path that could possibly be used
 (otherwise the pointer would not be unique).
 Therefore, the unique pointer hole records the shadow of the pointed-to heap memory.
@@ -594,6 +594,7 @@ $\gG(x)=\tyint$ and $\gU(x)=\refval{\qimm}{\tyint}$.
 We can easily do this by defining a typing judgement for shadows and
 defining a well-formedness condition for $\gU$ that ensures it is consistent with $\gG$.
 Similar to typing for layouts, $\uninit$ can only have types that other holes can have.
+\newline
 
 \fbox{$\tc{}{\gs}{\gt}$}
 
@@ -781,9 +782,11 @@ The use of \textsc{init} in \textsc{LS-REF} and \textsc{LS-VAR} ensures that
 the pointees of borrowed references and the payload of initialized variants
 are fully initialized.
 The $\textsc{droppable}(l)$ judgment checks that $l$ owns no initialized heap memory,
-i.e. $\own{\addr{\ga}{r}}$ is not reachable from $l$ except through references.
+i.e. $\own{\ga}$ is not reachable from $l$ except through references.
 These layouts are safe to deallocate because we cannot leak heap memory by doing so.
 The $\tc{V}{H}{\gU}$ judgment ensures that the shadow heap corresponds to the real heap.
+It also ensures that all heap memory is reachable from the stack and that
+every heap allocation has at least one owner: either a stack variable or a unique pointer.
 \newline
 
 \fbox{$\textsc{droppable}(l)$}
@@ -860,6 +863,7 @@ The $\tc{V}{H}{\gU}$ judgment ensures that the shadow heap corresponds to the re
 { 
 \dom{V}=\dom{\gU} \\\\
 \dom H = \textsc{reachable}(V,H) \\\\
+\forall \ga \in \dom H. \exists x. V(x) = \ga \lor \exists \addr{\ga'}{r}. \Read{H}{\addr{\ga'}{r}}{\own{\ga}} \\\\
 \forall x \in \dom{V}.~\tc{H}{H(V(x))}{\gU(x)}
 }
 {\tc{V}{H}{\gU}}
