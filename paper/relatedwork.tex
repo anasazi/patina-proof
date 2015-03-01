@@ -19,7 +19,7 @@ but Rust goes further than Cyclone by statically preventing dereferences of null
 Unlike Cyclone, Rust does not have first class regions, but Rust also
 lacks Cyclone's dynamic regions, which lessens the need for first class regions.
 
-Cyclone later added unique pointers and a notion of borrowing. \cite{cycsafe, cycexperience}
+Cyclone later added unique pointers and a notion of borrowing \cite{cycsafe, cycexperience}.
 Cyclone's version does not prevent memory leaks, which are possible both from
 freeing a unique pointer that contains another live unique pointer and from
 overwriting a live unique pointer. Rust statically guarantees no memory leaks in both
@@ -43,7 +43,7 @@ usage of linear data structures, particularly with regard to freeing them.
 Cyclone still has much Rust can learn from, e.g. a mechanism similar to
 dynamic regions could be used to support custom allocators in Rust.
 
-Walker and Watkins discuss how regions and linear types could be combined. \cite{regionsandlinear}
+Walker and Watkins discuss how regions and linear types could be combined \cite{regionsandlinear}.
 Their model supports first class regions, like Cyclone, but unlike Rust.
 It also introduces the idea of linear regions and provides a mechanism for
 temporarily aliasing them. This could be a fruitful ground for Rust to explore

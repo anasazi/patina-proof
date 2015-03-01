@@ -4,11 +4,14 @@ This is necessary to put us on a firm footing for other future work, and
 to ensure we have actually included everything necessary in our model.
 
 The expression and statement layers should be extended to match the path layer.
-Product types are straightforward to add to the borrow checker and will like not
+Product types are straightforward to add to the borrow checker and will likely not
 pose much trouble. Sum types may be more difficult. In particular, matching by
 reference allows creation of references to the payload of a sum type.
 The borrow checker must ensure that the sum is not mutated while such a reference
-exists. Extending the model with recursive types will require the addition of
+exists. 
+Work on adding existential types to imperative languages can likely be adapted
+for this purpose \cite{existentials}.
+Extending the model with recursive types will require the addition of
 top level (non-closure) recursive functions. Without the capability those functions
 give us it is impossible to free recursive values. Those functions will necessitate
 other additions, e.g. lifetime parameters. Type parameters likely do not have
@@ -32,10 +35,10 @@ It is unclear whether this means formalization of closures will be easier
 or whether formalization of traits will be harder.
 
 Recently, Rust has added some more advanced type system features.
-In particular, associated types and higher rank lifetimes.
-Associated types are effectively higher kinded types.
-Neither of these features will likely impact soundness, but they should still be
-carefully modeled.
+In particular, associated types and higher rank lifetime polymorphism are of interest.
+Associated types are effectively functions from types to types.
+Neither of these features will likely impact soundness, 
+but they should still be carefully modeled.
 
 There are many potential features that we could explore using our model.
 Several additional versions of borrowed references has been purposed,
